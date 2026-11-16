@@ -9,3 +9,14 @@ updates:
         patterns: ["*"]
     commit-message:
       prefix: ci
+
+  - package-ecosystem: terraform
+    directories:
+      - /gcp/**/*
+    schedule:
+      interval: weekly
+    groups:
+      terraform-providers:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
