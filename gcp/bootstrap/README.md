@@ -1,6 +1,6 @@
 # Bootstrap
 
-Creates the Cloud Storage bucket that stores Terraform state for every stack in this repository, including this one, and the service accounts that CI uses to run Terraform.
+Creates the Cloud Storage bucket that stores Terraform state for every stack in this repository, including this one, the service accounts that CI uses to run Terraform, and the Workload Identity Federation setup that lets GitHub Actions use those accounts without keys.
 
 ## What it creates
 
@@ -27,6 +27,24 @@ The plan account cannot write the lock file, so plans that use it must run with 
 
 The [`gcs` backend documentation](https://developer.hashicorp.com/terraform/language/backend/gcs) asks for Storage Object Admin. Storage Object User is enough to read, write and lock state. Per the [Cloud Storage IAM roles reference](https://docs.cloud.google.com/storage/docs/access-control/iam-roles), Storage Object Admin adds only object IAM and retention permissions, which the backend does not use.
 
+### Workload Identity Federation
+
+A workload identity pool `github` with an OIDC provider `github-actions` that trusts tokens from GitHub Actions (`https://token.actions.githubusercontent.com`). The provider:
+
+- accepts a token only if its `repository_id` and `repository_owner_id` claims match `github_repository_id` and `github_repository_owner_id`. Numeric IDs are unique and never reused, unlike names, which someone else can claim after a rename or deletion;
+- maps the token's `sub` claim to `google.subject`.
+
+Each CI service account grants Workload Identity User (`roles/iam.workloadIdentityUser`) to a single GitHub subject:
+
+| Service account | GitHub subject |
+| --- | --- |
+| `iac-foundation-ro` | `repo:<owner>/<repo>:pull_request` |
+| `iac-foundation-rw` | `repo:<owner>/<repo>:environment:<github_apply_environment>` |
+
+GitHub sets the `pull_request` subject only for jobs that don't use an environment. See [GitHub's example subject claims](https://docs.github.com/en/actions/reference/security/oidc#example-subject-claims) and [Workload Identity Federation with deployment pipelines](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines).
+
+The `workload_identity_provider` output is the provider's full resource name, the value that `google-github-actions/auth` takes as `workload_identity_provider`.
+
 ### APIs
 
 The APIs listed in `services` in `terraform.tfvars` are enabled in the seed project. Removing an API from the list does not disable it.
@@ -40,13 +58,14 @@ The APIs listed in `services` in `terraform.tfvars` are enabled in the seed proj
   - Storage Admin (`roles/storage.admin`)
   - Service Usage Admin (`roles/serviceusage.serviceUsageAdmin`)
   - Service Account Admin (`roles/iam.serviceAccountAdmin`)
+  - Workload Identity Pool Admin (`roles/iam.workloadIdentityPoolAdmin`)
 
 ## Configuration
 
 | File | Committed | Contents |
 | --- | --- | --- |
-| `terraform.tfvars` | Yes | `region`, `services` |
-| `private.auto.tfvars` | No | `project_id` |
+| `terraform.tfvars` | Yes | `region`, `services`, `github_apply_environment` |
+| `private.auto.tfvars` | No | `project_id`, `github_repository`, `github_repository_id`, `github_repository_owner_id` |
 | `backend.hcl` | No | `bucket`, the name of the state bucket |
 
 Create the two uncommitted files from their templates and fill in the values:
@@ -54,6 +73,12 @@ Create the two uncommitted files from their templates and fill in the values:
 ```sh
 cp private.auto.tfvars.example private.auto.tfvars
 cp backend.hcl.example backend.hcl
+```
+
+To look up the repository and owner IDs:
+
+```sh
+gh api repos/<owner>/<repo> --jq '.id, .owner.id'
 ```
 
 ## First run
