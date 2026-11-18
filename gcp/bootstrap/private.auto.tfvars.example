@@ -1,3 +1,4 @@
+org_id                     = "<organization-id>"
 project_id                 = "<prefix>-prod-iac-core-0"
 github_repository          = "<owner>/<repo>"
 github_repository_id       = "<repository-id>"
