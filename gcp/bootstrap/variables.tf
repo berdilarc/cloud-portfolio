@@ -3,6 +3,11 @@ variable "project_id" {
   description = "ID of the seed project that holds the Terraform state bucket and the CI identities."
 }
 
+variable "org_id" {
+  type        = string
+  description = "Numeric ID of the organization where the CI service accounts get their organization-level roles."
+}
+
 variable "region" {
   type        = string
   description = "Default region, also used as the location of the state bucket."

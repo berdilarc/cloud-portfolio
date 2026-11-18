@@ -80,3 +80,11 @@ resource "google_service_account_iam_member" "github_actions" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.value.oidc_subject}"
 }
+
+resource "google_organization_iam_member" "iac" {
+  for_each = local.iac_org_roles
+
+  org_id = var.org_id
+  role   = each.value.role
+  member = google_service_account.iac[each.value.service_account].member
+}
