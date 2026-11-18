@@ -1,6 +1,6 @@
 # Bootstrap
 
-Creates the Cloud Storage bucket that stores Terraform state for every stack in this repository, including this one, the service accounts that CI uses to run Terraform, and the Workload Identity Federation setup that lets GitHub Actions use those accounts without keys.
+Creates the Cloud Storage bucket that stores Terraform state for every stack in this repository, including this one, the service accounts that CI uses to run Terraform with their organization-level roles, and the Workload Identity Federation setup that lets GitHub Actions use those accounts without keys.
 
 ## What it creates
 
@@ -24,6 +24,15 @@ A plan and an apply service account for the foundation stack, with these roles o
 | `iac-foundation-rw` | `terraform apply` after merge | Storage Object User (`roles/storage.objectUser`) |
 
 The plan account cannot write the lock file, so plans that use it must run with `-lock=false`.
+
+Each account also gets the organization-level roles listed in its `org_roles` entry in `locals.tf`:
+
+| Service account | Role on the organization |
+| --- | --- |
+| `iac-foundation-ro` | Folder Viewer (`roles/resourcemanager.folderViewer`) |
+| `iac-foundation-rw` | Folder Creator (`roles/resourcemanager.folderCreator`) |
+
+The bindings use `google_organization_iam_member`, which adds one member to one role and leaves every other binding on the organization untouched. Permissions per role are listed in the [Resource Manager roles reference](https://docs.cloud.google.com/iam/docs/roles-permissions/resourcemanager).
 
 The [`gcs` backend documentation](https://developer.hashicorp.com/terraform/language/backend/gcs) asks for Storage Object Admin. Storage Object User is enough to read, write and lock state. Per the [Cloud Storage IAM roles reference](https://docs.cloud.google.com/storage/docs/access-control/iam-roles), Storage Object Admin adds only object IAM and retention permissions, which the backend does not use.
 
@@ -49,6 +58,8 @@ The `workload_identity_provider` output is the provider's full resource name, th
 
 The APIs listed in `services` in `terraform.tfvars` are enabled in the seed project. Removing an API from the list does not disable it.
 
+The CI service accounts live in the seed project, so the APIs they call through client libraries, such as Cloud Resource Manager, are billed to the seed project and must be enabled there.
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
@@ -59,13 +70,16 @@ The APIs listed in `services` in `terraform.tfvars` are enabled in the seed proj
   - Service Usage Admin (`roles/serviceusage.serviceUsageAdmin`)
   - Service Account Admin (`roles/iam.serviceAccountAdmin`)
   - Workload Identity Pool Admin (`roles/iam.workloadIdentityPoolAdmin`)
+- On the organization:
+  - Security Reviewer (`roles/iam.securityReviewer`), to read the organization IAM policy during `terraform plan`.
+  - Security Admin (`roles/iam.securityAdmin`), only when an apply adds or removes organization-level roles. Grant it before the apply and revoke it afterwards.
 
 ## Configuration
 
 | File | Committed | Contents |
 | --- | --- | --- |
 | `terraform.tfvars` | Yes | `region`, `services`, `github_apply_environment` |
-| `private.auto.tfvars` | No | `project_id`, `github_repository`, `github_repository_id`, `github_repository_owner_id` |
+| `private.auto.tfvars` | No | `org_id`, `project_id`, `github_repository`, `github_repository_id`, `github_repository_owner_id` |
 | `backend.hcl` | No | `bucket`, the name of the state bucket |
 
 Create the two uncommitted files from their templates and fill in the values:
@@ -73,6 +87,12 @@ Create the two uncommitted files from their templates and fill in the values:
 ```sh
 cp private.auto.tfvars.example private.auto.tfvars
 cp backend.hcl.example backend.hcl
+```
+
+To look up the organization ID:
+
+```sh
+gcloud organizations list
 ```
 
 To look up the repository and owner IDs:
