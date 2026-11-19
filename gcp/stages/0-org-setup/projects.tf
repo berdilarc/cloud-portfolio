@@ -1,5 +1,5 @@
 resource "google_project" "iac" {
-  name                = "IaC Core"
+  name                = local.iac_project_id
   project_id          = local.iac_project_id
   org_id              = var.org_id
   billing_account     = var.billing_account
@@ -15,7 +15,7 @@ resource "google_project_service" "iac" {
 }
 
 resource "google_project" "billing_export" {
-  name                = "Billing Export"
+  name                = local.billing_export_project_id
   project_id          = local.billing_export_project_id
   org_id              = var.org_id
   billing_account     = var.billing_account
