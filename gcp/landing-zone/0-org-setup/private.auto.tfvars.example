@@ -1,3 +1,5 @@
-prefix          = "<prefix>"
-org_id          = "<organization-id>"
-billing_account = "<billing-account-id>"
+prefix                     = "<prefix>"
+org_id                     = "<organization-id>"
+billing_account            = "<billing-account-id>"
+github_repository_id       = "<repository-id>"
+github_repository_owner_id = "<owner-id>"
