@@ -4,6 +4,7 @@ resource "google_storage_bucket" "tf_state" {
   storage_class               = "STANDARD"
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
+  force_destroy               = true
 
   versioning {
     enabled = true
@@ -17,10 +18,6 @@ resource "google_storage_bucket" "tf_state" {
     action {
       type = "Delete"
     }
-  }
-
-  lifecycle {
-    prevent_destroy = true
   }
 }
 
