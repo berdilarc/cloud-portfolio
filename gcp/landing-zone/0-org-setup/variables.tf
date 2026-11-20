@@ -18,6 +18,11 @@ variable "billing_account" {
   description = "ID of the billing account linked to every project, as XXXXXX-XXXXXX-XXXXXX."
 }
 
+variable "region" {
+  type        = string
+  description = "Region for regional resources, such as the IaC buckets."
+}
+
 variable "iac_project_services" {
   type        = set(string)
   description = "APIs to enable in the IaC core project. Removing an entry stops Terraform from managing the API but leaves it enabled."
