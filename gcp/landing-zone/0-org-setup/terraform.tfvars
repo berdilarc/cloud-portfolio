@@ -1,8 +1,6 @@
-region = "us-east1"
-services = [
+iac_project_services = [
   "cloudresourcemanager.googleapis.com",
   "iam.googleapis.com",
   "iamcredentials.googleapis.com",
   "sts.googleapis.com",
 ]
-github_apply_environment = "foundation"

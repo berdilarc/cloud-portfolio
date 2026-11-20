@@ -28,4 +28,3 @@ terraform.rc
 
 # Identifiers kept out of the public repo
 private.auto.tfvars
-backend.hcl
