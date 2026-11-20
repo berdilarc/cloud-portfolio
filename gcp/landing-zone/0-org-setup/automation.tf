@@ -28,3 +28,14 @@ resource "google_storage_bucket" "iac" {
 
   depends_on = [google_project_service.iac]
 }
+
+resource "google_service_account" "stage" {
+  for_each = local.stage_service_accounts
+
+  project      = google_project.iac.project_id
+  account_id   = each.key
+  display_name = each.value.display_name
+  description  = each.value.description
+
+  depends_on = [google_project_service.iac]
+}
