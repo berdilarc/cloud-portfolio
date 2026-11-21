@@ -11,14 +11,17 @@ locals {
   stages = {
     "0-org-setup" = {
       name      = "org setup"
+      ci        = true
       sa_prefix = "iac-org"
     }
     "2-networking" = {
       name      = "networking"
+      ci        = false
       sa_prefix = "iac-networking"
     }
     "2-project-factory" = {
       name      = "project factory"
+      ci        = false
       sa_prefix = "iac-pf"
     }
   }
@@ -50,6 +53,25 @@ locals {
     ]) : sa.id => sa
   }
 
+  ci_subjects = {
+    for id, sa in local.stage_service_accounts : id => (
+      sa.mode == "ro"
+      ? "repo:${var.github_repository}:pull_request"
+      : "repo:${var.github_repository}:environment:${sa.stage}"
+    ) if local.stages[sa.stage].ci
+  }
+
+  ro_service_accounts = toset([
+    for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
+  ])
+
+  local_plan_bindings = {
+    for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
+      service_account = pair[0]
+      member          = pair[1]
+    }
+  }
+
   managed_folder_stages = toset([
     for stage in keys(local.stages) : stage if stage != "0-org-setup"
   ])
@@ -69,9 +91,31 @@ locals {
     ]
   }
 
+  org_roles = {
+    "iac-org-rw" = [
+      "roles/iam.organizationRoleAdmin",
+      "roles/iam.securityAdmin",
+    ]
+    "iac-org-ro" = [
+      "roles/browser",
+      "roles/iam.securityReviewer",
+    ]
+  }
+
   iac_project_bindings = {
     for binding in flatten([
       for sa, roles in local.iac_project_roles : [
+        for role in roles : {
+          service_account = sa
+          role            = role
+        }
+      ]
+    ]) : "${binding.service_account} ${binding.role}" => binding
+  }
+
+  org_bindings = {
+    for binding in flatten([
+      for sa, roles in local.org_roles : [
         for role in roles : {
           service_account = sa
           role            = role

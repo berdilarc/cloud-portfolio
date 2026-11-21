@@ -71,3 +71,11 @@ resource "google_project_iam_member" "iac_storage_viewer" {
   role    = google_organization_iam_custom_role.storage_viewer.name
   member  = google_service_account.stage["iac-org-ro"].member
 }
+
+resource "google_service_account_iam_member" "local_plan" {
+  for_each = local.local_plan_bindings
+
+  service_account_id = google_service_account.stage[each.value.service_account].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value.member
+}
