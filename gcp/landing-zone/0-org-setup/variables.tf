@@ -18,6 +18,11 @@ variable "billing_account" {
   description = "ID of the billing account linked to every project, as XXXXXX-XXXXXX-XXXXXX."
 }
 
+variable "region" {
+  type        = string
+  description = "Region for regional resources, such as the IaC buckets."
+}
+
 variable "iac_project_services" {
   type        = set(string)
   description = "APIs to enable in the IaC core project. Removing an entry stops Terraform from managing the API but leaves it enabled."
@@ -31,4 +36,15 @@ variable "github_repository_id" {
 variable "github_repository_owner_id" {
   type        = string
   description = "Numeric ID of the GitHub user or organization that owns the repository."
+}
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub repository that runs the CI workflows, as owner/name."
+}
+
+variable "local_plan_principals" {
+  type        = set(string)
+  description = "IAM principals, such as user:name@example.com, that may impersonate the read-only stage service accounts to run terraform plan locally."
+  default     = []
 }

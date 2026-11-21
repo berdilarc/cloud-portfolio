@@ -1,0 +1,13 @@
+terraform {
+  backend "gcs" {
+    bucket                      = "${bucket}"
+%{ if prefix != null ~}
+    prefix                      = "${prefix}"
+%{ endif ~}
+    impersonate_service_account = "${service_account}"
+  }
+}
+
+provider "google" {
+  impersonate_service_account = "${service_account}"
+}
