@@ -23,7 +23,7 @@ locals {
         "iac-core"       = google_project.iac.project_id
       }
       service_accounts           = { for id, sa in google_service_account.stage : id => sa.email }
-      storage_buckets            = { for id, bucket in google_storage_bucket.iac : id => bucket.name }
+      storage_buckets            = local.storage_buckets
       workload_identity_provider = google_iam_workload_identity_pool_provider.github_actions.name
     })
   }

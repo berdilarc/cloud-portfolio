@@ -1,34 +1,3 @@
-resource "google_storage_bucket" "iac" {
-  for_each = local.iac_buckets
-
-  name                        = "${google_project.iac.project_id}-${each.key}"
-  project                     = google_project.iac.project_id
-  location                    = var.region
-  storage_class               = "STANDARD"
-  uniform_bucket_level_access = true
-  public_access_prevention    = "enforced"
-
-  versioning {
-    enabled = true
-  }
-
-  lifecycle_rule {
-    condition {
-      num_newer_versions         = 5
-      days_since_noncurrent_time = 30
-    }
-    action {
-      type = "Delete"
-    }
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
-  depends_on = [google_project_service.iac]
-}
-
 resource "google_service_account" "stage" {
   for_each = local.stage_service_accounts
 
@@ -49,24 +18,6 @@ resource "google_service_account" "cicd" {
   description  = each.value.description
 
   depends_on = [google_project_service.iac]
-}
-
-resource "google_storage_managed_folder" "stage_state" {
-  for_each = local.managed_folder_stages
-
-  bucket = google_storage_bucket.iac["stage-state"].name
-  name   = "${each.key}/"
-}
-
-resource "google_storage_managed_folder_iam_member" "stage_state" {
-  for_each = {
-    for id, sa in local.stage_service_accounts : id => sa if contains(local.managed_folder_stages, sa.stage)
-  }
-
-  bucket         = google_storage_managed_folder.stage_state[each.value.stage].bucket
-  managed_folder = google_storage_managed_folder.stage_state[each.value.stage].name
-  role           = local.stage_modes[each.value.mode].state_role
-  member         = google_service_account.stage[each.key].member
 }
 
 resource "google_project_iam_member" "iac" {

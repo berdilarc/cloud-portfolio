@@ -1,6 +1,6 @@
 output "storage_buckets" {
   description = "Name of each automation bucket, keyed by purpose."
-  value       = { for id, bucket in google_storage_bucket.iac : id => bucket.name }
+  value       = local.storage_buckets
 }
 
 output "service_accounts" {

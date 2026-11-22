@@ -56,16 +56,19 @@ locals {
   cicd_modes = {
     ro = {
       access     = "read-only"
+      plans_role = null
       stage_mode = "ro"
       trigger    = "on pull requests"
     }
     merge = {
       access     = "merge plan"
+      plans_role = "roles/storage.objectCreator"
       stage_mode = "ro"
       trigger    = "on merges to main"
     }
     rw = {
       access     = "read-write"
+      plans_role = "roles/storage.objectViewer"
       stage_mode = "rw"
       trigger    = "after environment approval"
     }
@@ -90,6 +93,15 @@ locals {
       ] if stage_config.cicd
     ]) : sa.id => sa
   }
+
+  cicd_stages = toset([
+    for stage, stage_config in local.stages : stage if stage_config.cicd
+  ])
+
+  storage_buckets = merge(
+    { for id, bucket in google_storage_bucket.iac : id => bucket.name },
+    { "cicd-plans" = google_storage_bucket.cicd_plans.name },
+  )
 
   ro_service_accounts = toset([
     for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
