@@ -45,6 +45,24 @@ resource "google_storage_bucket" "iac" {
   depends_on = [google_project_service.iac]
 }
 
+resource "google_storage_managed_folder" "stage_state" {
+  for_each = local.managed_folder_stages
+
+  bucket = google_storage_bucket.iac["stage-state"].name
+  name   = "${each.key}/"
+}
+
+resource "google_storage_managed_folder_iam_member" "stage_state" {
+  for_each = {
+    for id, sa in local.stage_service_accounts : id => sa if contains(local.managed_folder_stages, sa.stage)
+  }
+
+  bucket         = google_storage_managed_folder.stage_state[each.value.stage].bucket
+  managed_folder = google_storage_managed_folder.stage_state[each.value.stage].name
+  role           = local.stage_modes[each.value.mode].state_role
+  member         = google_service_account.stage[each.key].member
+}
+
 resource "google_storage_bucket" "cicd_plans" {
   name                        = "${google_project.iac.project_id}-cicd-plans"
   project                     = google_project.iac.project_id
@@ -71,24 +89,6 @@ resource "google_storage_bucket" "cicd_plans" {
   }
 
   depends_on = [google_project_service.iac]
-}
-
-resource "google_storage_managed_folder" "stage_state" {
-  for_each = local.managed_folder_stages
-
-  bucket = google_storage_bucket.iac["stage-state"].name
-  name   = "${each.key}/"
-}
-
-resource "google_storage_managed_folder_iam_member" "stage_state" {
-  for_each = {
-    for id, sa in local.stage_service_accounts : id => sa if contains(local.managed_folder_stages, sa.stage)
-  }
-
-  bucket         = google_storage_managed_folder.stage_state[each.value.stage].bucket
-  managed_folder = google_storage_managed_folder.stage_state[each.value.stage].name
-  role           = local.stage_modes[each.value.mode].state_role
-  member         = google_service_account.stage[each.key].member
 }
 
 resource "google_storage_managed_folder" "cicd_plans" {
