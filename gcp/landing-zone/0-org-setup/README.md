@@ -29,7 +29,7 @@ Three buckets in the IaC core project, named `<project-id>-<purpose>`, in `regio
 | --- | --- |
 | `org-state` | State of this stage |
 | `stage-state` | State of the later stages, one managed folder per stage |
-| `outputs` | Files generated for the later stages (see [Output files](#output-files)) |
+| `config` | Files that a stage copies into its directory before `terraform init`: generated providers and tfvars files (see [Output files](#output-files)), and private inputs (see [Configuration](#configuration)) |
 
 All three have uniform bucket-level access, enforced public access prevention, and object versioning. A lifecycle rule deletes a noncurrent version once it has 5 newer versions and has been noncurrent for 30 days; an object [has to match all conditions](https://docs.cloud.google.com/storage/docs/lifecycle) of a rule. Terraform refuses to destroy the buckets (`prevent_destroy`).
 
@@ -112,7 +112,7 @@ The stage accounts have no Workload Identity User bindings. A workflow reaches t
 
 ### Output files
 
-The stage writes these files to the `outputs` bucket:
+The stage writes these files to the `config` bucket:
 
 | Object | Contents |
 | --- | --- |
@@ -143,6 +143,12 @@ Create the uncommitted file from its template and fill in the values:
 cp private.auto.tfvars.example private.auto.tfvars
 ```
 
+CI/CD has no copy of the file, so upload it to the `config` bucket after each change:
+
+```sh
+gcloud storage cp private.auto.tfvars gs://<prefix>-prod-iac-core-0-config/private/0-org-setup.auto.tfvars
+```
+
 To look up the organization and billing account IDs:
 
 ```sh
@@ -161,7 +167,7 @@ gh api repos/<owner>/<repository> --jq '.id, .owner.id'
 The state is in the `org-state` bucket. To plan as `iac-org-ro`:
 
 ```sh
-gcloud storage cp gs://<prefix>-prod-iac-core-0-outputs/providers/0-org-setup-ro-providers.tf .
+gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf .
 terraform init
 terraform plan -lock=false
 ```
@@ -176,7 +182,7 @@ To apply as `iac-org-rw`, replace the read-only providers file with the read-wri
 
 ```sh
 rm 0-org-setup-ro-providers.tf
-gcloud storage cp gs://<prefix>-prod-iac-core-0-outputs/providers/0-org-setup-providers.tf .
+gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-providers.tf .
 terraform init -reconfigure
 terraform plan -out tfplan
 terraform apply tfplan
@@ -186,7 +192,7 @@ Then switch back:
 
 ```sh
 rm tfplan 0-org-setup-providers.tf
-gcloud storage cp gs://<prefix>-prod-iac-core-0-outputs/providers/0-org-setup-ro-providers.tf .
+gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf .
 terraform init -reconfigure
 ```
 
