@@ -45,20 +45,20 @@ locals {
   }
 
   cicd_modes = {
-    ro = {
-      access     = "read-only"
+    pr = {
+      purpose    = "pull request plan"
       plans_role = null
       stage_mode = "ro"
       trigger    = "on pull requests"
     }
     merge = {
-      access     = "merge plan"
+      purpose    = "merge plan"
       plans_role = "roles/storage.objectCreator"
       stage_mode = "ro"
       trigger    = "on merges to main"
     }
-    rw = {
-      access     = "read-write"
+    apply = {
+      purpose    = "apply"
       plans_role = "roles/storage.objectViewer"
       stage_mode = "rw"
       trigger    = "after environment approval"
@@ -73,12 +73,12 @@ locals {
           stage         = stage
           mode          = mode
           stage_account = "${stage_config.sa_prefix}-${mode_config.stage_mode}"
-          display_name  = "IaC ${stage_config.name} CI/CD (${mode_config.access})"
+          display_name  = "IaC ${stage_config.name} CI/CD (${mode_config.purpose})"
           description   = "Runs terraform ${local.stage_modes[mode_config.stage_mode].command} for the ${stage} stage ${mode_config.trigger}, as ${stage_config.sa_prefix}-${mode_config.stage_mode}."
           subject = {
-            ro    = "repo:${var.github_repository}:pull_request"
+            pr    = "repo:${var.github_repository}:pull_request"
             merge = "repo:${var.github_repository}:ref:refs/heads/main"
-            rw    = "repo:${var.github_repository}:environment:${stage}"
+            apply = "repo:${var.github_repository}:environment:${stage}"
           }[mode]
         }
       ] if stage_config.enable_cicd
