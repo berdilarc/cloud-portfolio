@@ -24,10 +24,10 @@ resource "google_iam_workload_identity_pool_provider" "github_actions" {
   }
 }
 
-resource "google_service_account_iam_member" "ci" {
-  for_each = local.ci_subjects
+resource "google_service_account_iam_member" "cicd_workload_identity" {
+  for_each = local.cicd_service_accounts
 
-  service_account_id = google_service_account.stage[each.key].name
+  service_account_id = google_service_account.cicd[each.key].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.value}"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.value.subject}"
 }

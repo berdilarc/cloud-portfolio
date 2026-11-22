@@ -4,8 +4,11 @@ output "storage_buckets" {
 }
 
 output "service_accounts" {
-  description = "Email of each stage service account, keyed by account ID."
-  value       = { for id, sa in google_service_account.stage : id => sa.email }
+  description = "Email of each stage and CI/CD service account, keyed by account ID."
+  value = merge(
+    { for id, sa in google_service_account.stage : id => sa.email },
+    { for id, sa in google_service_account.cicd : id => sa.email },
+  )
 }
 
 output "workload_identity_provider" {

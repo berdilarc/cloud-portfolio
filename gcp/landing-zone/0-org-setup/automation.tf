@@ -40,6 +40,17 @@ resource "google_service_account" "stage" {
   depends_on = [google_project_service.iac]
 }
 
+resource "google_service_account" "cicd" {
+  for_each = local.cicd_service_accounts
+
+  project      = google_project.iac.project_id
+  account_id   = each.key
+  display_name = each.value.display_name
+  description  = each.value.description
+
+  depends_on = [google_project_service.iac]
+}
+
 resource "google_storage_managed_folder" "stage_state" {
   for_each = local.managed_folder_stages
 
@@ -78,4 +89,12 @@ resource "google_service_account_iam_member" "local_plan" {
   service_account_id = google_service_account.stage[each.value.service_account].name
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = each.value.member
+}
+
+resource "google_service_account_iam_member" "cicd_impersonation" {
+  for_each = local.cicd_service_accounts
+
+  service_account_id = google_service_account.stage[each.value.stage_account].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = google_service_account.cicd[each.key].member
 }

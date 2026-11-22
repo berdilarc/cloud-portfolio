@@ -11,17 +11,17 @@ locals {
   stages = {
     "0-org-setup" = {
       name      = "org setup"
-      ci        = true
+      cicd      = true
       sa_prefix = "iac-org"
     }
     "2-networking" = {
       name      = "networking"
-      ci        = false
+      cicd      = false
       sa_prefix = "iac-networking"
     }
     "2-project-factory" = {
       name      = "project factory"
-      ci        = false
+      cicd      = false
       sa_prefix = "iac-pf"
     }
   }
@@ -53,12 +53,42 @@ locals {
     ]) : sa.id => sa
   }
 
-  ci_subjects = {
-    for id, sa in local.stage_service_accounts : id => (
-      sa.mode == "ro"
-      ? "repo:${var.github_repository}:pull_request"
-      : "repo:${var.github_repository}:environment:${sa.stage}"
-    ) if local.stages[sa.stage].ci
+  cicd_modes = {
+    ro = {
+      access     = "read-only"
+      stage_mode = "ro"
+      trigger    = "on pull requests"
+    }
+    merge = {
+      access     = "merge plan"
+      stage_mode = "ro"
+      trigger    = "on merges to main"
+    }
+    rw = {
+      access     = "read-write"
+      stage_mode = "rw"
+      trigger    = "after environment approval"
+    }
+  }
+
+  cicd_service_accounts = {
+    for sa in flatten([
+      for stage, stage_config in local.stages : [
+        for mode, mode_config in local.cicd_modes : {
+          id            = "${stage_config.sa_prefix}-cicd-${mode}"
+          stage         = stage
+          mode          = mode
+          stage_account = "${stage_config.sa_prefix}-${mode_config.stage_mode}"
+          display_name  = "IaC ${stage_config.name} CI/CD (${mode_config.access})"
+          description   = "Runs terraform ${local.stage_modes[mode_config.stage_mode].command} for the ${stage} stage ${mode_config.trigger}, as ${stage_config.sa_prefix}-${mode_config.stage_mode}."
+          subject = {
+            ro    = "repo:${var.github_repository}:pull_request"
+            merge = "repo:${var.github_repository}:ref:refs/heads/main"
+            rw    = "repo:${var.github_repository}:environment:${stage}"
+          }[mode]
+        }
+      ] if stage_config.cicd
+    ]) : sa.id => sa
   }
 
   ro_service_accounts = toset([
