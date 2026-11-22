@@ -45,6 +45,14 @@ resource "google_storage_bucket" "iac" {
   depends_on = [google_project_service.iac]
 }
 
+resource "google_storage_bucket_iam_member" "config_cicd" {
+  for_each = local.cicd_service_accounts
+
+  bucket = google_storage_bucket.iac["config"].name
+  role   = "roles/storage.objectViewer"
+  member = google_service_account.cicd[each.key].member
+}
+
 resource "google_storage_managed_folder" "stage_state" {
   for_each = local.managed_folder_stages
 
