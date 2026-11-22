@@ -2,7 +2,7 @@ locals {
   iac_buckets = toset([
     "org-state",
     "stage-state",
-    "outputs",
+    "config",
   ])
 
   managed_folder_stages = toset([

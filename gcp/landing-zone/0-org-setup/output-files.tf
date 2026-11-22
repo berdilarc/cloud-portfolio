@@ -33,7 +33,7 @@ resource "google_storage_bucket_object" "providers" {
   for_each = local.provider_files
 
   name    = "providers/${each.key}-providers.tf"
-  bucket  = google_storage_bucket.iac["outputs"].name
+  bucket  = google_storage_bucket.iac["config"].name
   content = templatefile("${path.module}/templates/providers.tftpl", each.value)
 }
 
@@ -41,6 +41,6 @@ resource "google_storage_bucket_object" "tfvars" {
   for_each = local.tfvars_files
 
   name    = "tfvars/${each.key}.auto.tfvars.json"
-  bucket  = google_storage_bucket.iac["outputs"].name
+  bucket  = google_storage_bucket.iac["config"].name
   content = each.value
 }
