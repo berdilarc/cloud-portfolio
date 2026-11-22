@@ -45,12 +45,22 @@ variable "github_repository" {
 
 variable "local_plan_principals" {
   type        = set(string)
-  description = "IAM principals, such as user:name@example.com, that may impersonate the read-only stage service accounts to run terraform plan locally."
+  description = "IAM principals, such as user:name@example.com, that may impersonate the read-only stage service accounts to run terraform plan locally, and issue short-lived tokens for the agent service account."
   default     = []
+
+  validation {
+    condition     = !anytrue([for principal in var.local_plan_principals : startswith(principal, "serviceAccount:${google_service_account.agent.account_id}@")])
+    error_message = "The agent service account already gets its plan bindings, so it can't be a local plan principal."
+  }
 }
 
 variable "local_apply_principals" {
   type        = set(string)
   description = "IAM principals, such as user:name@example.com, that may impersonate the read-write stage service accounts to run terraform apply locally."
   default     = []
+
+  validation {
+    condition     = !anytrue([for principal in var.local_apply_principals : startswith(principal, "serviceAccount:${google_service_account.agent.account_id}@")])
+    error_message = "The agent service account may only run plans, so it can't be a local apply principal."
+  }
 }

@@ -4,10 +4,11 @@ output "storage_buckets" {
 }
 
 output "service_accounts" {
-  description = "Email of each stage and CI/CD service account, keyed by account ID."
+  description = "Email of each stage, CI/CD, and agent service account, keyed by account ID."
   value = merge(
     { for id, sa in google_service_account.stage : id => sa.email },
     { for id, sa in google_service_account.cicd : id => sa.email },
+    { (google_service_account.agent.account_id) = google_service_account.agent.email },
   )
 }
 
