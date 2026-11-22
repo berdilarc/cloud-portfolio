@@ -3,8 +3,19 @@ locals {
     for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
   ])
 
+  rw_service_accounts = toset([
+    for id, sa in local.stage_service_accounts : id if sa.mode == "rw"
+  ])
+
   local_plan_bindings = {
     for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
+      service_account = pair[0]
+      member          = pair[1]
+    }
+  }
+
+  local_apply_bindings = {
+    for pair in setproduct(local.rw_service_accounts, var.local_apply_principals) : "${pair[0]} ${pair[1]}" => {
       service_account = pair[0]
       member          = pair[1]
     }
@@ -50,6 +61,14 @@ resource "google_service_account" "stage" {
 
 resource "google_service_account_iam_member" "local_plan" {
   for_each = local.local_plan_bindings
+
+  service_account_id = google_service_account.stage[each.value.service_account].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value.member
+}
+
+resource "google_service_account_iam_member" "local_apply" {
+  for_each = local.local_apply_bindings
 
   service_account_id = google_service_account.stage[each.value.service_account].name
   role               = "roles/iam.serviceAccountTokenCreator"

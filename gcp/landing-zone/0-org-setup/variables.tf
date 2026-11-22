@@ -48,3 +48,9 @@ variable "local_plan_principals" {
   description = "IAM principals, such as user:name@example.com, that may impersonate the read-only stage service accounts to run terraform plan locally."
   default     = []
 }
+
+variable "local_apply_principals" {
+  type        = set(string)
+  description = "IAM principals, such as user:name@example.com, that may impersonate the read-write stage service accounts to run terraform apply locally."
+  default     = []
+}
