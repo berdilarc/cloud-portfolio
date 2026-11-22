@@ -1,28 +1,19 @@
 locals {
-  iac_project_id            = "${var.prefix}-prod-iac-core-0"
-  billing_export_project_id = "${var.prefix}-prod-billing-export-0"
-
-  iac_buckets = toset([
-    "org-state",
-    "stage-state",
-    "outputs",
-  ])
-
   stages = {
     "0-org-setup" = {
-      name      = "org setup"
-      cicd      = true
-      sa_prefix = "iac-org"
+      name        = "org setup"
+      enable_cicd = true
+      sa_prefix   = "iac-org"
     }
     "2-networking" = {
-      name      = "networking"
-      cicd      = false
-      sa_prefix = "iac-networking"
+      name        = "networking"
+      enable_cicd = false
+      sa_prefix   = "iac-networking"
     }
     "2-project-factory" = {
-      name      = "project factory"
-      cicd      = false
-      sa_prefix = "iac-pf"
+      name        = "project factory"
+      enable_cicd = false
+      sa_prefix   = "iac-pf"
     }
   }
 
@@ -90,79 +81,12 @@ locals {
             rw    = "repo:${var.github_repository}:environment:${stage}"
           }[mode]
         }
-      ] if stage_config.cicd
+      ] if stage_config.enable_cicd
     ]) : sa.id => sa
   }
-
-  cicd_stages = toset([
-    for stage, stage_config in local.stages : stage if stage_config.cicd
-  ])
 
   storage_buckets = merge(
     { for id, bucket in google_storage_bucket.iac : id => bucket.name },
     { "cicd-plans" = google_storage_bucket.cicd_plans.name },
   )
-
-  ro_service_accounts = toset([
-    for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
-  ])
-
-  local_plan_bindings = {
-    for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
-      service_account = pair[0]
-      member          = pair[1]
-    }
-  }
-
-  managed_folder_stages = toset([
-    for stage in keys(local.stages) : stage if stage != "0-org-setup"
-  ])
-
-  iac_project_roles = {
-    "iac-org-rw" = [
-      "roles/iam.serviceAccountAdmin",
-      "roles/iam.workloadIdentityPoolAdmin",
-      "roles/resourcemanager.projectIamAdmin",
-      "roles/serviceusage.serviceUsageAdmin",
-      "roles/storage.admin",
-    ]
-    "iac-org-ro" = [
-      "roles/iam.serviceAccountViewer",
-      "roles/iam.workloadIdentityPoolViewer",
-      "roles/serviceusage.serviceUsageViewer",
-    ]
-  }
-
-  org_roles = {
-    "iac-org-rw" = [
-      "roles/iam.organizationRoleAdmin",
-      "roles/iam.securityAdmin",
-    ]
-    "iac-org-ro" = [
-      "roles/browser",
-      "roles/iam.securityReviewer",
-    ]
-  }
-
-  iac_project_bindings = {
-    for binding in flatten([
-      for sa, roles in local.iac_project_roles : [
-        for role in roles : {
-          service_account = sa
-          role            = role
-        }
-      ]
-    ]) : "${binding.service_account} ${binding.role}" => binding
-  }
-
-  org_bindings = {
-    for binding in flatten([
-      for sa, roles in local.org_roles : [
-        for role in roles : {
-          service_account = sa
-          role            = role
-        }
-      ]
-    ]) : "${binding.service_account} ${binding.role}" => binding
-  }
 }

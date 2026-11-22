@@ -1,3 +1,42 @@
+locals {
+  ro_service_accounts = toset([
+    for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
+  ])
+
+  local_plan_bindings = {
+    for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
+      service_account = pair[0]
+      member          = pair[1]
+    }
+  }
+
+  iac_project_roles = {
+    "iac-org-rw" = [
+      "roles/iam.serviceAccountAdmin",
+      "roles/iam.workloadIdentityPoolAdmin",
+      "roles/resourcemanager.projectIamAdmin",
+      "roles/serviceusage.serviceUsageAdmin",
+      "roles/storage.admin",
+    ]
+    "iac-org-ro" = [
+      "roles/iam.serviceAccountViewer",
+      "roles/iam.workloadIdentityPoolViewer",
+      "roles/serviceusage.serviceUsageViewer",
+    ]
+  }
+
+  iac_project_bindings = {
+    for binding in flatten([
+      for sa, roles in local.iac_project_roles : [
+        for role in roles : {
+          service_account = sa
+          role            = role
+        }
+      ]
+    ]) : "${binding.service_account} ${binding.role}" => binding
+  }
+}
+
 resource "google_service_account" "stage" {
   for_each = local.stage_service_accounts
 
@@ -9,15 +48,12 @@ resource "google_service_account" "stage" {
   depends_on = [google_project_service.iac]
 }
 
-resource "google_service_account" "cicd" {
-  for_each = local.cicd_service_accounts
+resource "google_service_account_iam_member" "local_plan" {
+  for_each = local.local_plan_bindings
 
-  project      = google_project.iac.project_id
-  account_id   = each.key
-  display_name = each.value.display_name
-  description  = each.value.description
-
-  depends_on = [google_project_service.iac]
+  service_account_id = google_service_account.stage[each.value.service_account].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value.member
 }
 
 resource "google_project_iam_member" "iac" {
@@ -32,20 +68,4 @@ resource "google_project_iam_member" "iac_storage_viewer" {
   project = google_project.iac.project_id
   role    = google_organization_iam_custom_role.storage_viewer.name
   member  = google_service_account.stage["iac-org-ro"].member
-}
-
-resource "google_service_account_iam_member" "local_plan" {
-  for_each = local.local_plan_bindings
-
-  service_account_id = google_service_account.stage[each.value.service_account].name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = each.value.member
-}
-
-resource "google_service_account_iam_member" "cicd_impersonation" {
-  for_each = local.cicd_service_accounts
-
-  service_account_id = google_service_account.stage[each.value.stage_account].name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = google_service_account.cicd[each.key].member
 }

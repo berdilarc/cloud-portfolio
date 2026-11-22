@@ -1,3 +1,19 @@
+locals {
+  iac_buckets = toset([
+    "org-state",
+    "stage-state",
+    "outputs",
+  ])
+
+  managed_folder_stages = toset([
+    for stage in keys(local.stages) : stage if stage != "0-org-setup"
+  ])
+
+  cicd_stages = toset([
+    for stage, stage_config in local.stages : stage if stage_config.enable_cicd
+  ])
+}
+
 resource "google_storage_bucket" "iac" {
   for_each = local.iac_buckets
 
