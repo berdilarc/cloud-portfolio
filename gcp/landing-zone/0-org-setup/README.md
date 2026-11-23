@@ -100,13 +100,13 @@ A workload identity pool `github` in the IaC core project, with an OIDC provider
 - accepts a token only if its `repository_id` and `repository_owner_id` claims match `github_repository_id` and `github_repository_owner_id`. [Google recommends the numeric IDs](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) because names can be claimed by someone else after a rename or deletion, and IDs are never reused;
 - maps the token's `sub` claim to `google.subject`. See [GitHub's example subject claims](https://docs.github.com/en/actions/reference/security/oidc#example-subject-claims).
 
-Workflows impersonate the CI/CD accounts with Workload Identity User (`roles/iam.workloadIdentityUser`), granted per subject:
+Workflows impersonate the CI/CD accounts with Workload Identity User (`roles/iam.workloadIdentityUser`), granted per subject. The subjects use GitHub's immutable format, which adds the owner and repository IDs to the names. [GitHub uses it for repositories created after July 15, 2026](https://docs.github.com/en/actions/reference/security/oidc), so the stage builds the prefix from `github_repository`, `github_repository_owner_id`, and `github_repository_id`:
 
 | Subject | Account |
 | --- | --- |
-| `repo:<owner>/<repository>:pull_request` | `iac-org-cicd-pr` |
-| `repo:<owner>/<repository>:ref:refs/heads/main` | `iac-org-cicd-merge` |
-| `repo:<owner>/<repository>:environment:0-org-setup` | `iac-org-cicd-apply` |
+| `repo:<owner>@<owner-id>/<repository>@<repository-id>:pull_request` | `iac-org-cicd-pr` |
+| `repo:<owner>@<owner-id>/<repository>@<repository-id>:ref:refs/heads/main` | `iac-org-cicd-merge` |
+| `repo:<owner>@<owner-id>/<repository>@<repository-id>:environment:0-org-setup` | `iac-org-cicd-apply` |
 
 The stage accounts have no Workload Identity User bindings. A workflow reaches them only through its CI/CD account.
 
