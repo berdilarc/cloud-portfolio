@@ -1,0 +1,32 @@
+name: stage-0-org-setup
+
+on:
+  pull_request:
+    paths:
+      - gcp/landing-zone/0-org-setup/**
+      - .github/workflows/terraform.yml
+      - .github/workflows/stage-0-org-setup.yml
+      - mise.toml
+      - mise.lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform:
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation login to Google Cloud
+      pull-requests: write # plan summary comment
+    uses: ./.github/workflows/terraform.yml
+    with:
+      stage: 0-org-setup
+      working_directory: gcp/landing-zone/0-org-setup
+    secrets:
+      workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      config_bucket: ${{ secrets.GCP_CONFIG_BUCKET }}
+      pr_service_account: ${{ secrets.ORG_SETUP_CICD_PR_SA }}

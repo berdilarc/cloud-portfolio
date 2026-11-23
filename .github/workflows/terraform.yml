@@ -1,0 +1,112 @@
+name: terraform
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        type: string
+        description: Stage name, as used in the config bucket paths.
+        required: true
+      working_directory:
+        type: string
+        description: Directory of the stage, relative to the repository root.
+        required: true
+    secrets:
+      workload_identity_provider:
+        description: Full resource name of the GitHub Actions Workload Identity provider.
+        required: true
+      config_bucket:
+        description: Bucket that holds the providers files and private inputs.
+        required: true
+      pr_service_account:
+        description: CI/CD service account for pull request plans.
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  pr-plan:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation login to Google Cloud
+      pull-requests: write # plan summary comment
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+    env:
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mask project identifiers
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.pr_service_account }}
+          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.workload_identity_provider }}
+        run: |
+          project_id=${SERVICE_ACCOUNT#*@}
+          project_id=${project_id%%.*}
+          project_number=$(echo "$WORKLOAD_IDENTITY_PROVIDER" | cut -d / -f 2)
+          echo "::add-mask::${project_id}"
+          echo "::add-mask::${project_number}"
+
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          version: 2026.11.9
+          install_args: terraform
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.workload_identity_provider }}
+          service_account: ${{ secrets.pr_service_account }}
+
+      - name: Download config files
+        env:
+          CONFIG_BUCKET: ${{ secrets.config_bucket }}
+        run: |
+          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-ro-providers.tf" .
+          gcloud storage cp "gs://${CONFIG_BUCKET}/private/${STAGE}.auto.tfvars" private.auto.tfvars
+
+      - name: Mask private values
+        run: |
+          values=$(grep -o '"[^"]*"' private.auto.tfvars | tr -d '"')
+          { echo "$values"; echo "$values" | sed -n 's/^[a-zA-Z]*://p'; } | sort -u | grep -v '^$' > "$RUNNER_TEMP/private-values.txt"
+          while read -r value; do
+            echo "::add-mask::${value}"
+          done < "$RUNNER_TEMP/private-values.txt"
+
+      - name: Terraform init
+        run: terraform init -input=false -lockfile=readonly -no-color
+
+      - name: Terraform plan
+        run: terraform plan -input=false -lock=false -no-color -out tfplan > /dev/null
+
+      - name: Summarize plan
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mapfile -t private_values < "$RUNNER_TEMP/private-values.txt"
+          {
+            echo "### Terraform plan: ${STAGE} at ${HEAD_SHA::7}"
+            echo
+            terraform show -json tfplan | jq -r '
+              def redact: reduce ($ARGS.positional[] | select(. != "")) as $v (.; split($v) | join("***"));
+              [.resource_changes[]? | select(.change.actions != ["no-op"])
+                | "- `\(.address | redact)`: \(.change.actions | join(", "))"]
+              + [(.output_changes // {}) | to_entries[] | select(.value.actions != ["no-op"])
+                | "- `output.\(.key | redact)`: \(.value.actions | join(", "))"]
+              | if . == [] then "No changes." else join("\n") end' --args "${private_values[@]}"
+          } > plan-summary.md
+          cat plan-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file plan-summary.md
