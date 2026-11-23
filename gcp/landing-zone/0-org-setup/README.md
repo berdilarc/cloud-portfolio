@@ -84,12 +84,13 @@ The accounts and principals that impersonate others get Service Account Token Cr
 | Principal | Token Creator on |
 | --- | --- |
 | `local_plan_principals` | Every read-only account and `iac-agent` |
-| `local_apply_principals` | Every read-write account |
 | `iac-agent` | Every read-only account |
 | `iac-org-cicd-pr`, `iac-org-cicd-merge` | `iac-org-ro` |
 | `iac-org-cicd-apply` | `iac-org-rw` |
 
-`iac-agent` can't be listed in `local_plan_principals`, since it already gets its bindings, or in `local_apply_principals`. The variable validations reject it in both.
+`iac-agent` can't be listed in `local_plan_principals`, since it already gets its bindings. The variable validation rejects it.
+
+No person gets Token Creator on a read-write account, so only CI/CD applies the stage. See [Break-glass apply](../../../docs/runbooks/0-org-setup-break-glass-apply.md) for the exception.
 
 On the stage's managed folder in `cicd-plans`, `iac-org-cicd-merge` gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and `iac-org-cicd-apply` gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
 
@@ -129,7 +130,6 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 
 - Terraform 1.17.0 or later.
 - For plans: membership in `local_plan_principals`.
-- For applies: membership in `local_apply_principals`.
 - For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), plus Billing Account User (`roles/billing.user`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects).
 
 ## Configuration
@@ -137,7 +137,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 | File | Committed | Contents |
 | --- | --- | --- |
 | `terraform.tfvars` | Yes | `region`, `iac_project_services` |
-| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `local_plan_principals`, `local_apply_principals` |
+| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `local_plan_principals` |
 
 Create the uncommitted file from its template and fill in the values:
 
@@ -178,24 +178,6 @@ To give a coding agent plan access, mint a short-lived token for `iac-agent` and
 
 ```sh
 gcloud auth print-access-token --impersonate-service-account iac-agent@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
-```
-
-To apply as `iac-org-rw`, replace the read-only providers file with the read-write one, since only one of them can be in the directory at a time:
-
-```sh
-rm 0-org-setup-ro-providers.tf
-gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-providers.tf .
-terraform init -reconfigure
-terraform plan -out tfplan
-terraform apply tfplan
-```
-
-Then switch back:
-
-```sh
-rm tfplan 0-org-setup-providers.tf
-gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf .
-terraform init -reconfigure
 ```
 
 To apply with your own credentials, as for the first apply, use a backend without impersonation instead of the providers file, for example a `backend.tf` that isn't committed:
