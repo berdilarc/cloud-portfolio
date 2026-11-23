@@ -3,6 +3,7 @@ locals {
     "iac-org-rw" = [
       "roles/iam.organizationRoleAdmin",
       "roles/iam.securityAdmin",
+      "roles/resourcemanager.projectCreator",
     ]
     "iac-org-ro" = [
       "roles/browser",
