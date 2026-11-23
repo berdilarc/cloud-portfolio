@@ -34,7 +34,7 @@ jobs:
     secrets:
       workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       config_bucket: ${{ secrets.GCP_CONFIG_BUCKET }}
-      plans_bucket: ${{ secrets.GCP_PLANS_BUCKET }}
+      plans_bucket: ${{ secrets.GCP_CICD_PLANS_BUCKET }}
       pr_service_account: ${{ secrets.ORG_SETUP_CICD_PR_SA }}
       merge_service_account: ${{ secrets.ORG_SETUP_CICD_MERGE_SA }}
       CICD_APPLY_SA: ${{ secrets.CICD_APPLY_SA }}
