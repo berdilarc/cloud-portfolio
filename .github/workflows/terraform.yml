@@ -70,7 +70,7 @@ jobs:
         env:
           CONFIG_BUCKET: ${{ secrets.config_bucket }}
         run: |
-          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-ro-providers.tf" .
+          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-ro-providers.tf" "${STAGE}-ro-providers.tf"
           gcloud storage cp "gs://${CONFIG_BUCKET}/private/${STAGE}.auto.tfvars" private.auto.tfvars
 
       - name: Mask private values
