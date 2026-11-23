@@ -9,7 +9,3 @@ github_repository_owner_id = "<owner-id>"
 local_plan_principals = [
   "user:<name>@example.com",
 ]
-
-local_apply_principals = [
-  "user:<name>@example.com",
-]
