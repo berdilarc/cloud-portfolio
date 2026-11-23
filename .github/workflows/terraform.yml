@@ -114,11 +114,24 @@ jobs:
             echo
             jq -r '
               def redact: reduce ($ARGS.positional[] | select(. != "")) as $v (.; split($v) | join("***"));
-              [.resource_changes[]? | select(.change.actions != ["no-op"])
-                | "- `\(.address | redact)`: \(.change.actions | join(", "))"]
+              def count($action): [.resource_changes[]? | select(any(.change.actions[]; . == $action))] | length;
+              def pad($width): . + " " * ($width - length);
+              def line($address):
+                {
+                  "create": ["+", "create"],
+                  "update": ["!", "update"],
+                  "delete": ["-", "delete"],
+                  "delete,create": ["-/+", "replace"],
+                  "create,delete": ["+/-", "replace"]
+                }[join(",")] // ["", join(", ")]
+                | "\(.[0] | pad(3)) \(.[1] | pad(8)) \($address | redact)";
+              ([.resource_changes[]? | select(.change.actions != ["no-op"])
+                | .address as $address | .change.actions | line($address)]
               + [(.output_changes // {}) | to_entries[] | select(.value.actions != ["no-op"])
-                | "- `output.\(.key | redact)`: \(.value.actions | join(", "))"]
-              | if . == [] then "No changes." else join("\n") end' "$RUNNER_TEMP/tfplan.json" --args "${private_values[@]}"
+                | "output.\(.key)" as $address | .value.actions | line($address)]) as $lines
+              | if $lines == [] then "No changes."
+                else "Plan: \(count("create")) to add, \(count("update")) to change, \(count("delete")) to destroy.\n\n```diff\n\($lines | join("\n"))\n```"
+                end' "$RUNNER_TEMP/tfplan.json" --args "${private_values[@]}"
           } > plan-summary.md
           cat plan-summary.md >> "$GITHUB_STEP_SUMMARY"
 
