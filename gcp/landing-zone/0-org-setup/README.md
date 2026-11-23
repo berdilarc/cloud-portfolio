@@ -68,16 +68,22 @@ The later stages' service accounts get only their state access from this stage, 
 
 The read-only accounts can't write the state lock, so their plans run with `-lock=false`.
 
-The stage 0 service accounts get the roles that this stage needs:
+The stage 0 service accounts get the roles below. At organization level these are the roles that [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/blob/v60.0.0/fast/stages/0-org-setup/datasets/classic/organization/.config.yaml) grants, so the stage can manage a new type of organization resource without first granting itself a role.
 
 | Account | Scope | Roles |
 | --- | --- | --- |
-| `iac-org-rw` | IaC core project | Service Account Admin, Workload Identity Pool Admin, Project IAM Admin, Service Usage Admin, Storage Admin |
-| `iac-org-rw` | Organization | Organization Role Administrator, Project Creator, Security Admin |
-| `iac-org-ro` | IaC core project | Service Account Viewer, Workload Identity Pool Viewer, Service Usage Viewer, Storage Viewer with IAM (custom) |
-| `iac-org-ro` | Organization | Browser, Security Reviewer |
+| `iac-org-rw` | IaC core project | Service Account Admin, Workload Identity Pool Admin, Service Usage Admin, Storage Admin |
+| `iac-org-rw` | Organization | Access Context Manager Admin, Cloud Asset Viewer, Essential Contacts Admin, Folder Admin, IAM Workforce Pool Admin, Logging Admin, Organization Administrator, Organization Policy Administrator, Organization Role Administrator, Project Creator, Project Mover, Tag Administrator, Tag User |
+| `iac-org-ro` | IaC core project | Service Account Viewer, Workload Identity Pool Viewer, Storage Viewer with IAM (custom) |
+| `iac-org-ro` | Organization | Cloud Asset Viewer, Essential Contacts Viewer, Folder Viewer, IAM Workforce Pool Viewer, Logs Viewer, Organization Admin Viewer (custom), Organization Policy Viewer, Organization Role Viewer, Service Usage Viewer, Tag Viewer, Tag Viewer with IAM (custom) |
 
-The custom role `storageViewer` (Storage Viewer with IAM) is defined on the organization. It reads buckets, managed folders, and objects, together with the IAM policies of buckets and managed folders.
+The custom roles are defined on the organization, with the permissions of FAST's roles of the same name:
+
+| Role ID | Title | Reads |
+| --- | --- | --- |
+| `organizationAdminViewer` | Organization Admin Viewer | The organization, folders, and projects with their IAM policies, org policies, Essential Contacts, logging settings, and bucket IAM policies |
+| `storageViewer` | Storage Viewer with IAM | Buckets, managed folders, and objects with their IAM policies, bucket tags, object insights, and multipart uploads |
+| `tagViewer` | Tag Viewer with IAM | Tag keys and tag values with their IAM policies, and tag holds |
 
 The accounts and principals that impersonate others get Service Account Token Creator (`roles/iam.serviceAccountTokenCreator`) on them:
 
@@ -122,7 +128,7 @@ The stage writes these files to the `config` bucket:
 | `providers/<stage>-providers.tf` | gcs backend and `google` provider, both impersonating the stage's read-write account |
 | `providers/<stage>-ro-providers.tf` | The same for the read-only account |
 | `tfvars/0-globals.auto.tfvars.json` | Billing account, organization, prefix, and region |
-| `tfvars/0-org-setup.auto.tfvars.json` | Custom role, project IDs, service accounts, buckets, and the workload identity provider |
+| `tfvars/0-org-setup.auto.tfvars.json` | Custom roles, project IDs, service accounts, buckets, and the workload identity provider |
 
 A stage copies the files it needs into its directory. They hold identifiers, so `.gitignore` keeps them out of the repository.
 
