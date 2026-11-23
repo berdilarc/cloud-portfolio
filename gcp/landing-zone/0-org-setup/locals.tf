@@ -65,6 +65,14 @@ locals {
     }
   }
 
+  github_subject_prefix = format(
+    "repo:%s@%s/%s@%s",
+    split("/", var.github_repository)[0],
+    var.github_repository_owner_id,
+    split("/", var.github_repository)[1],
+    var.github_repository_id,
+  )
+
   cicd_service_accounts = {
     for sa in flatten([
       for stage, stage_config in local.stages : [
@@ -76,9 +84,9 @@ locals {
           display_name  = "IaC ${stage_config.name} CI/CD (${mode_config.purpose})"
           description   = "Runs terraform ${local.stage_modes[mode_config.stage_mode].command} for the ${stage} stage ${mode_config.trigger}, as ${stage_config.sa_prefix}-${mode_config.stage_mode}."
           subject = {
-            pr    = "repo:${var.github_repository}:pull_request"
-            merge = "repo:${var.github_repository}:ref:refs/heads/main"
-            apply = "repo:${var.github_repository}:environment:${stage}"
+            pr    = "${local.github_subject_prefix}:pull_request"
+            merge = "${local.github_subject_prefix}:ref:refs/heads/main"
+            apply = "${local.github_subject_prefix}:environment:${stage}"
           }[mode]
         }
       ] if stage_config.enable_cicd
