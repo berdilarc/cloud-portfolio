@@ -1,32 +1,59 @@
-resource "google_storage_bucket" "iac" {
-  for_each = local.iac_buckets
+locals {
+  ro_service_accounts = toset([
+    for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
+  ])
 
-  name                        = "${google_project.iac.project_id}-${each.key}"
-  project                     = google_project.iac.project_id
-  location                    = var.region
-  storage_class               = "STANDARD"
-  uniform_bucket_level_access = true
-  public_access_prevention    = "enforced"
+  rw_service_accounts = toset([
+    for id, sa in local.stage_service_accounts : id if sa.mode == "rw"
+  ])
 
-  versioning {
-    enabled = true
-  }
+  local_plan_bindings = merge(
+    {
+      for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
+        service_account = pair[0]
+        member          = pair[1]
+      }
+    },
+    {
+      for sa in local.ro_service_accounts : "${sa} agent" => {
+        service_account = sa
+        member          = google_service_account.agent.member
+      }
+    },
+  )
 
-  lifecycle_rule {
-    condition {
-      num_newer_versions         = 5
-      days_since_noncurrent_time = 30
+  local_apply_bindings = {
+    for pair in setproduct(local.rw_service_accounts, var.local_apply_principals) : "${pair[0]} ${pair[1]}" => {
+      service_account = pair[0]
+      member          = pair[1]
     }
-    action {
-      type = "Delete"
-    }
   }
 
-  lifecycle {
-    prevent_destroy = true
+  iac_project_roles = {
+    "iac-org-rw" = [
+      "roles/iam.serviceAccountAdmin",
+      "roles/iam.workloadIdentityPoolAdmin",
+      "roles/resourcemanager.projectIamAdmin",
+      "roles/serviceusage.serviceUsageAdmin",
+      "roles/storage.admin",
+    ]
+    "iac-org-ro" = [
+      "roles/iam.serviceAccountViewer",
+      "roles/iam.workloadIdentityPoolViewer",
+      "roles/serviceusage.serviceUsageViewer",
+    ]
   }
 
-  depends_on = [google_project_service.iac]
+  iac_project_bindings = {
+    for binding in flatten([
+      for sa, roles in local.iac_project_roles : [
+        for role in roles : {
+          service_account = sa
+          role            = role
+        }
+      ]
+    ]) : "${binding.service_account} ${binding.role}" => binding
+  }
 }
 
 resource "google_service_account" "stage" {
@@ -40,22 +67,37 @@ resource "google_service_account" "stage" {
   depends_on = [google_project_service.iac]
 }
 
-resource "google_storage_managed_folder" "stage_state" {
-  for_each = local.managed_folder_stages
+resource "google_service_account_iam_member" "local_plan" {
+  for_each = local.local_plan_bindings
 
-  bucket = google_storage_bucket.iac["stage-state"].name
-  name   = "${each.key}/"
+  service_account_id = google_service_account.stage[each.value.service_account].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value.member
 }
 
-resource "google_storage_managed_folder_iam_member" "stage_state" {
-  for_each = {
-    for id, sa in local.stage_service_accounts : id => sa if contains(local.managed_folder_stages, sa.stage)
-  }
+resource "google_service_account_iam_member" "local_apply" {
+  for_each = local.local_apply_bindings
 
-  bucket         = google_storage_managed_folder.stage_state[each.value.stage].bucket
-  managed_folder = google_storage_managed_folder.stage_state[each.value.stage].name
-  role           = local.stage_modes[each.value.mode].state_role
-  member         = google_service_account.stage[each.key].member
+  service_account_id = google_service_account.stage[each.value.service_account].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value.member
+}
+
+resource "google_service_account" "agent" {
+  project      = google_project.iac.project_id
+  account_id   = "iac-agent"
+  display_name = "IaC agent"
+  description  = "Identity for coding agents. Has no roles of its own; runs terraform plan by impersonating the read-only stage accounts."
+
+  depends_on = [google_project_service.iac]
+}
+
+resource "google_service_account_iam_member" "agent" {
+  for_each = var.local_plan_principals
+
+  service_account_id = google_service_account.agent.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.key
 }
 
 resource "google_project_iam_member" "iac" {
@@ -70,12 +112,4 @@ resource "google_project_iam_member" "iac_storage_viewer" {
   project = google_project.iac.project_id
   role    = google_organization_iam_custom_role.storage_viewer.name
   member  = google_service_account.stage["iac-org-ro"].member
-}
-
-resource "google_service_account_iam_member" "local_plan" {
-  for_each = local.local_plan_bindings
-
-  service_account_id = google_service_account.stage[each.value.service_account].name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = each.value.member
 }

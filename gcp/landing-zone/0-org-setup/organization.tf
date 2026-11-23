@@ -1,3 +1,28 @@
+locals {
+  org_roles = {
+    "iac-org-rw" = [
+      "roles/iam.organizationRoleAdmin",
+      "roles/iam.securityAdmin",
+      "roles/resourcemanager.projectCreator",
+    ]
+    "iac-org-ro" = [
+      "roles/browser",
+      "roles/iam.securityReviewer",
+    ]
+  }
+
+  org_bindings = {
+    for binding in flatten([
+      for sa, roles in local.org_roles : [
+        for role in roles : {
+          service_account = sa
+          role            = role
+        }
+      ]
+    ]) : "${binding.service_account} ${binding.role}" => binding
+  }
+}
+
 resource "google_organization_iam_custom_role" "storage_viewer" {
   role_id     = "storageViewer"
   org_id      = var.org_id

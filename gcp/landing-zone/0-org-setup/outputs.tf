@@ -1,11 +1,15 @@
 output "storage_buckets" {
   description = "Name of each automation bucket, keyed by purpose."
-  value       = { for id, bucket in google_storage_bucket.iac : id => bucket.name }
+  value       = local.storage_buckets
 }
 
 output "service_accounts" {
-  description = "Email of each stage service account, keyed by account ID."
-  value       = { for id, sa in google_service_account.stage : id => sa.email }
+  description = "Email of each stage, CI/CD, and agent service account, keyed by account ID."
+  value = merge(
+    { for id, sa in google_service_account.stage : id => sa.email },
+    { for id, sa in google_service_account.cicd : id => sa.email },
+    { (google_service_account.agent.account_id) = google_service_account.agent.email },
+  )
 }
 
 output "workload_identity_provider" {

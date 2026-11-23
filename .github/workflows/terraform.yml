@@ -1,0 +1,229 @@
+name: terraform
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        type: string
+        description: Stage name, as used in the config and plans bucket paths and as the environment name.
+        required: true
+      working_directory:
+        type: string
+        description: Directory of the stage, relative to the repository root.
+        required: true
+    secrets:
+      workload_identity_provider:
+        description: Full resource name of the GitHub Actions Workload Identity provider.
+        required: true
+      config_bucket:
+        description: Bucket that holds the providers files and private inputs.
+        required: true
+      plans_bucket:
+        description: Bucket that holds the merge plans.
+        required: true
+      pr_service_account:
+        description: CI/CD service account for pull request plans.
+        required: true
+      merge_service_account:
+        description: CI/CD service account for merge plans.
+        required: true
+      # An environment secret reaches the job that sets the environment only under its own name.
+      CICD_APPLY_SA:
+        description: CI/CD service account for applies, a secret of the stage's environment.
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation login to Google Cloud
+      pull-requests: write # plan summary comment
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+    env:
+      STAGE: ${{ inputs.stage }}
+    outputs:
+      applyable: ${{ steps.summary.outputs.applyable }}
+      plan_attempt: ${{ steps.upload.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mask project identifiers
+        env:
+          SERVICE_ACCOUNT: ${{ github.event_name == 'push' && secrets.merge_service_account || secrets.pr_service_account }}
+          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.workload_identity_provider }}
+        run: |
+          project_id=${SERVICE_ACCOUNT#*@}
+          project_id=${project_id%%.*}
+          project_number=$(echo "$WORKLOAD_IDENTITY_PROVIDER" | cut -d / -f 2)
+          echo "::add-mask::${project_id}"
+          echo "::add-mask::${project_number}"
+
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          version: 2026.11.9
+          install_args: terraform
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.workload_identity_provider }}
+          service_account: ${{ github.event_name == 'push' && secrets.merge_service_account || secrets.pr_service_account }}
+
+      - name: Download config files
+        env:
+          CONFIG_BUCKET: ${{ secrets.config_bucket }}
+        run: |
+          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-ro-providers.tf" "${STAGE}-ro-providers.tf"
+          gcloud storage cp "gs://${CONFIG_BUCKET}/private/${STAGE}.auto.tfvars" private.auto.tfvars
+
+      - name: Mask private values
+        run: |
+          values=$(grep -o '"[^"]*"' private.auto.tfvars | tr -d '"')
+          { echo "$values"; echo "$values" | sed -n 's/^[a-zA-Z]*://p'; } | sort -u | grep -v '^$' > "$RUNNER_TEMP/private-values.txt"
+          while read -r value; do
+            echo "::add-mask::${value}"
+          done < "$RUNNER_TEMP/private-values.txt"
+
+      - name: Terraform init
+        run: terraform init -input=false -lockfile=readonly -no-color
+
+      - name: Terraform plan
+        run: terraform plan -input=false -lock=false -no-color -out tfplan > /dev/null
+
+      - name: Summarize plan
+        id: summary
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          terraform show -json tfplan > "$RUNNER_TEMP/tfplan.json"
+          applyable=$(jq '.applyable' "$RUNNER_TEMP/tfplan.json")
+          echo "applyable=${applyable}" >> "$GITHUB_OUTPUT"
+          mapfile -t private_values < "$RUNNER_TEMP/private-values.txt"
+          {
+            echo "### Terraform plan: ${STAGE} at ${COMMIT_SHA::7}"
+            echo
+            jq -r '
+              def redact: reduce ($ARGS.positional[] | select(. != "")) as $v (.; split($v) | join("***"));
+              [.resource_changes[]? | select(.change.actions != ["no-op"])
+                | "- `\(.address | redact)`: \(.change.actions | join(", "))"]
+              + [(.output_changes // {}) | to_entries[] | select(.value.actions != ["no-op"])
+                | "- `output.\(.key | redact)`: \(.value.actions | join(", "))"]
+              | if . == [] then "No changes." else join("\n") end' "$RUNNER_TEMP/tfplan.json" --args "${private_values[@]}"
+          } > plan-summary.md
+          cat plan-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file plan-summary.md
+
+      # gcloud storage cp reads the destination object first, which Object Creator doesn't allow.
+      - name: Upload merge plan
+        id: upload
+        if: github.event_name == 'push' && steps.summary.outputs.applyable == 'true'
+        env:
+          PLANS_BUCKET: ${{ secrets.plans_bucket }}
+        run: |
+          token=$(gcloud auth print-access-token)
+          echo "::add-mask::${token}"
+          curl --silent --show-error --fail-with-body \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/octet-stream" \
+            --data-binary @tfplan \
+            "https://storage.googleapis.com/upload/storage/v1/b/${PLANS_BUCKET}/o?uploadType=media&ifGenerationMatch=0&name=${STAGE}%2F${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}.tfplan"
+          echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+  apply:
+    needs: plan
+    if: github.event_name == 'push' && needs.plan.outputs.applyable == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.stage }}
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation login to Google Cloud
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+    env:
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mask project identifiers
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.CICD_APPLY_SA }}
+          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.workload_identity_provider }}
+        run: |
+          project_id=${SERVICE_ACCOUNT#*@}
+          project_id=${project_id%%.*}
+          project_number=$(echo "$WORKLOAD_IDENTITY_PROVIDER" | cut -d / -f 2)
+          echo "::add-mask::${project_id}"
+          echo "::add-mask::${project_number}"
+
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          version: 2026.11.9
+          install_args: terraform
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.workload_identity_provider }}
+          service_account: ${{ secrets.CICD_APPLY_SA }}
+
+      - name: Download config files and merge plan
+        env:
+          CONFIG_BUCKET: ${{ secrets.config_bucket }}
+          PLANS_BUCKET: ${{ secrets.plans_bucket }}
+          PLAN_ATTEMPT: ${{ needs.plan.outputs.plan_attempt }}
+        run: |
+          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-providers.tf" "${STAGE}-providers.tf"
+          gcloud storage cp "gs://${CONFIG_BUCKET}/private/${STAGE}.auto.tfvars" private.auto.tfvars
+          gcloud storage cp "gs://${PLANS_BUCKET}/${STAGE}/${GITHUB_SHA}-${PLAN_ATTEMPT}.tfplan" merge.tfplan
+
+      - name: Mask private values
+        run: |
+          values=$(grep -o '"[^"]*"' private.auto.tfvars | tr -d '"')
+          { echo "$values"; echo "$values" | sed -n 's/^[a-zA-Z]*://p'; } | sort -u | grep -v '^$' > "$RUNNER_TEMP/private-values.txt"
+          while read -r value; do
+            echo "::add-mask::${value}"
+          done < "$RUNNER_TEMP/private-values.txt"
+
+      - name: Terraform init
+        run: terraform init -input=false -lockfile=readonly -no-color
+
+      - name: Terraform plan
+        run: terraform plan -input=false -no-color -out tfplan > /dev/null
+
+      - name: Compare with merge plan
+        run: |
+          changes='{
+            resource_changes: ([.resource_changes[]? | select(.change.actions != ["no-op"])] | sort_by(.address)),
+            output_changes: ((.output_changes // {}) | with_entries(select(.value.actions != ["no-op"])))
+          }'
+          terraform show -json merge.tfplan | jq -S "$changes" > "$RUNNER_TEMP/merge-changes.json"
+          terraform show -json tfplan | jq -S "$changes" > "$RUNNER_TEMP/changes.json"
+          if ! cmp -s "$RUNNER_TEMP/merge-changes.json" "$RUNNER_TEMP/changes.json"; then
+            echo "::error::The plan differs from the approved merge plan. Re-run all jobs to create a new merge plan."
+            exit 1
+          fi
+
+      - name: Terraform apply
+        run: terraform apply -input=false -no-color tfplan > /dev/null

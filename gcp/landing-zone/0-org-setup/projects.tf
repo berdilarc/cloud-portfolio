@@ -1,3 +1,8 @@
+locals {
+  iac_project_id            = "${var.prefix}-prod-iac-core-0"
+  billing_export_project_id = "${var.prefix}-prod-billing-export-0"
+}
+
 resource "google_project" "iac" {
   name                = local.iac_project_id
   project_id          = local.iac_project_id

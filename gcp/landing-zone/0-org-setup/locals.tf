@@ -1,28 +1,19 @@
 locals {
-  iac_project_id            = "${var.prefix}-prod-iac-core-0"
-  billing_export_project_id = "${var.prefix}-prod-billing-export-0"
-
-  iac_buckets = toset([
-    "org-state",
-    "stage-state",
-    "outputs",
-  ])
-
   stages = {
     "0-org-setup" = {
-      name      = "org setup"
-      ci        = true
-      sa_prefix = "iac-org"
+      name        = "org setup"
+      enable_cicd = true
+      sa_prefix   = "iac-org"
     }
     "2-networking" = {
-      name      = "networking"
-      ci        = false
-      sa_prefix = "iac-networking"
+      name        = "networking"
+      enable_cicd = false
+      sa_prefix   = "iac-networking"
     }
     "2-project-factory" = {
-      name      = "project factory"
-      ci        = false
-      sa_prefix = "iac-pf"
+      name        = "project factory"
+      enable_cicd = false
+      sa_prefix   = "iac-pf"
     }
   }
 
@@ -53,74 +44,57 @@ locals {
     ]) : sa.id => sa
   }
 
-  ci_subjects = {
-    for id, sa in local.stage_service_accounts : id => (
-      sa.mode == "ro"
-      ? "repo:${var.github_repository}:pull_request"
-      : "repo:${var.github_repository}:environment:${sa.stage}"
-    ) if local.stages[sa.stage].ci
-  }
-
-  ro_service_accounts = toset([
-    for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
-  ])
-
-  local_plan_bindings = {
-    for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
-      service_account = pair[0]
-      member          = pair[1]
+  cicd_modes = {
+    pr = {
+      purpose    = "pull request plan"
+      plans_role = null
+      stage_mode = "ro"
+      trigger    = "on pull requests"
+    }
+    merge = {
+      purpose    = "merge plan"
+      plans_role = "roles/storage.objectCreator"
+      stage_mode = "ro"
+      trigger    = "on merges to main"
+    }
+    apply = {
+      purpose    = "apply"
+      plans_role = "roles/storage.objectViewer"
+      stage_mode = "rw"
+      trigger    = "after environment approval"
     }
   }
 
-  managed_folder_stages = toset([
-    for stage in keys(local.stages) : stage if stage != "0-org-setup"
-  ])
+  github_subject_prefix = format(
+    "repo:%s@%s/%s@%s",
+    split("/", var.github_repository)[0],
+    var.github_repository_owner_id,
+    split("/", var.github_repository)[1],
+    var.github_repository_id,
+  )
 
-  iac_project_roles = {
-    "iac-org-rw" = [
-      "roles/iam.serviceAccountAdmin",
-      "roles/iam.workloadIdentityPoolAdmin",
-      "roles/resourcemanager.projectIamAdmin",
-      "roles/serviceusage.serviceUsageAdmin",
-      "roles/storage.admin",
-    ]
-    "iac-org-ro" = [
-      "roles/iam.serviceAccountViewer",
-      "roles/iam.workloadIdentityPoolViewer",
-      "roles/serviceusage.serviceUsageViewer",
-    ]
-  }
-
-  org_roles = {
-    "iac-org-rw" = [
-      "roles/iam.organizationRoleAdmin",
-      "roles/iam.securityAdmin",
-    ]
-    "iac-org-ro" = [
-      "roles/browser",
-      "roles/iam.securityReviewer",
-    ]
-  }
-
-  iac_project_bindings = {
-    for binding in flatten([
-      for sa, roles in local.iac_project_roles : [
-        for role in roles : {
-          service_account = sa
-          role            = role
+  cicd_service_accounts = {
+    for sa in flatten([
+      for stage, stage_config in local.stages : [
+        for mode, mode_config in local.cicd_modes : {
+          id            = "${stage_config.sa_prefix}-cicd-${mode}"
+          stage         = stage
+          mode          = mode
+          stage_account = "${stage_config.sa_prefix}-${mode_config.stage_mode}"
+          display_name  = "IaC ${stage_config.name} CI/CD (${mode_config.purpose})"
+          description   = "Runs terraform ${local.stage_modes[mode_config.stage_mode].command} for the ${stage} stage ${mode_config.trigger}, as ${stage_config.sa_prefix}-${mode_config.stage_mode}."
+          subject = {
+            pr    = "${local.github_subject_prefix}:pull_request"
+            merge = "${local.github_subject_prefix}:ref:refs/heads/main"
+            apply = "${local.github_subject_prefix}:environment:${stage}"
+          }[mode]
         }
-      ]
-    ]) : "${binding.service_account} ${binding.role}" => binding
+      ] if stage_config.enable_cicd
+    ]) : sa.id => sa
   }
 
-  org_bindings = {
-    for binding in flatten([
-      for sa, roles in local.org_roles : [
-        for role in roles : {
-          service_account = sa
-          role            = role
-        }
-      ]
-    ]) : "${binding.service_account} ${binding.role}" => binding
-  }
+  storage_buckets = merge(
+    { for id, bucket in google_storage_bucket.iac : id => bucket.name },
+    { "cicd-plans" = google_storage_bucket.cicd_plans.name },
+  )
 }

@@ -6,13 +6,16 @@
 
 <!-- The problem or goal this addresses. -->
 
+## IAM and manual steps
+
+<!-- Grants, uploads, or console steps done by hand before or after the merge, or "None". -->
+
 ## How to verify
 
 <!-- Commands run, plan output, screenshots. -->
 
 ## Checklist
 
-- [ ] `pre-commit run --all-files` passes
-- [ ] Terraform plan reviewed (if infrastructure changed)
+- [ ] Plan comment reviewed: it shows only the intended changes
 - [ ] No billable resources left running unintentionally
 - [ ] Docs updated where relevant

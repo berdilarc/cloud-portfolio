@@ -23,7 +23,7 @@ locals {
         "iac-core"       = google_project.iac.project_id
       }
       service_accounts           = { for id, sa in google_service_account.stage : id => sa.email }
-      storage_buckets            = { for id, bucket in google_storage_bucket.iac : id => bucket.name }
+      storage_buckets            = local.storage_buckets
       workload_identity_provider = google_iam_workload_identity_pool_provider.github_actions.name
     })
   }
@@ -33,7 +33,7 @@ resource "google_storage_bucket_object" "providers" {
   for_each = local.provider_files
 
   name    = "providers/${each.key}-providers.tf"
-  bucket  = google_storage_bucket.iac["outputs"].name
+  bucket  = google_storage_bucket.iac["config"].name
   content = templatefile("${path.module}/templates/providers.tftpl", each.value)
 }
 
@@ -41,6 +41,6 @@ resource "google_storage_bucket_object" "tfvars" {
   for_each = local.tfvars_files
 
   name    = "tfvars/${each.key}.auto.tfvars.json"
-  bucket  = google_storage_bucket.iac["outputs"].name
+  bucket  = google_storage_bucket.iac["config"].name
   content = each.value
 }
