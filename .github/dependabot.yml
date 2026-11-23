@@ -4,6 +4,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]
@@ -15,6 +17,8 @@ updates:
       - /gcp/**/*
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       terraform-providers:
         patterns: ["*"]
