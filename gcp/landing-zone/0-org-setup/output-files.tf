@@ -15,9 +15,7 @@ locals {
       region          = var.region
     })
     "0-org-setup" = jsonencode({
-      custom_roles = {
-        storage_viewer = google_organization_iam_custom_role.storage_viewer.name
-      }
+      custom_roles = { for key, role in google_organization_iam_custom_role.stage : key => role.name }
       project_ids = {
         "billing-export" = google_project.billing_export.project_id
         "iac-core"       = google_project.iac.project_id

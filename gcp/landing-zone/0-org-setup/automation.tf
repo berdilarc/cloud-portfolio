@@ -22,14 +22,12 @@ locals {
     "iac-org-rw" = [
       "roles/iam.serviceAccountAdmin",
       "roles/iam.workloadIdentityPoolAdmin",
-      "roles/resourcemanager.projectIamAdmin",
       "roles/serviceusage.serviceUsageAdmin",
       "roles/storage.admin",
     ]
     "iac-org-ro" = [
       "roles/iam.serviceAccountViewer",
       "roles/iam.workloadIdentityPoolViewer",
-      "roles/serviceusage.serviceUsageViewer",
     ]
   }
 
@@ -91,6 +89,6 @@ resource "google_project_iam_member" "iac" {
 
 resource "google_project_iam_member" "iac_storage_viewer" {
   project = google_project.iac.project_id
-  role    = google_organization_iam_custom_role.storage_viewer.name
+  role    = google_organization_iam_custom_role.stage["storage_viewer"].name
   member  = google_service_account.stage["iac-org-ro"].member
 }
