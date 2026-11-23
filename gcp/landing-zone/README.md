@@ -2,7 +2,7 @@
 
 The Google Cloud foundation for this repository: the organization-level setup that workload projects build on. It is split into stages that are applied in order. Each stage is a separate Terraform root module with its own state.
 
-The layout follows the stage names of [Cloud Foundation Fabric FAST](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/master/fast). The code is plain Terraform with `google_*` resources and doesn't use the Fabric modules.
+The layout follows the stage names of [Cloud Foundation Fabric FAST](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast). The code is plain Terraform with `google_*` resources and doesn't use the Fabric modules. [ADR 0002](../../docs/decisions/0002-structure-the-landing-zone-as-fast-style-stages-in-plain-terraform.md) explains why.
 
 | Stage | Contents |
 | --- | --- |
@@ -16,7 +16,7 @@ Names follow [ADR 0001](../../docs/decisions/0001-name-resources-with-prefix-env
 
 ## CI/CD
 
-Each stage with CI/CD has a caller workflow that runs the reusable workflow [`terraform.yml`](../../.github/workflows/terraform.yml), with an environment named after the stage and the stage's three CI/CD accounts (see [Service accounts](0-org-setup/README.md#service-accounts)). So far only `0-org-setup` has one: [`stage-0-org-setup.yml`](../../.github/workflows/stage-0-org-setup.yml) runs when a change touches the stage directory, either workflow file, `mise.toml`, or `mise.lock`. Terraform comes from `mise.toml`.
+Each stage with CI/CD has a caller workflow that runs the reusable workflow [`terraform.yml`](../../.github/workflows/terraform.yml), with an environment named after the stage and the stage's three CI/CD accounts (see [Service accounts](0-org-setup/README.md#service-accounts)). So far only `0-org-setup` has one: [`stage-0-org-setup.yml`](../../.github/workflows/stage-0-org-setup.yml) runs when a change touches the stage directory, either workflow file, or `mise.toml` and `mise.lock`, which pin Terraform.
 
 | Trigger | Job | Account | What it does |
 | --- | --- | --- | --- |
@@ -54,4 +54,4 @@ An environment `0-org-setup` with a required reviewer and the environment secret
 gh secret set CICD_APPLY_SA --env 0-org-setup --body iac-org-cicd-apply@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
 ```
 
-Only a job in the environment can impersonate `iac-org-cicd-apply`, because its Workload Identity User binding is on the `environment:0-org-setup` subject, and such a job [gets environment secrets only after approval](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments). A reusable workflow receives an environment secret only in the job that sets the environment, and [only under its own name](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows), so `terraform.yml` declares it as `CICD_APPLY_SA`.
+Only a job in the environment can impersonate `iac-org-cicd-apply`, because its Workload Identity User binding is on the `environment:0-org-setup` subject, and such a job [gets environment secrets only after approval](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
