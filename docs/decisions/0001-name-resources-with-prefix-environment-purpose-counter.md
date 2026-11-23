@@ -16,7 +16,7 @@ The repository is public. We prefer to keep real project IDs, bucket names, and 
 
 The organization holds a long-lived shared foundation and short-lived workload projects. There is a single real environment, but the workloads should be able to show a multi-environment layout.
 
-Google publishes two reference conventions: the one in the [enterprise foundations blueprint](https://docs.cloud.google.com/architecture/blueprints/security-foundations/summary#naming-conventions) and the one used by [Fabric FAST](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/master/fast).
+Google publishes two reference conventions: the one in the [enterprise foundations blueprint](https://docs.cloud.google.com/architecture/blueprints/security-foundations/summary#naming-conventions) and the one used by [Fabric FAST](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast).
 
 ## Decision
 
@@ -26,8 +26,8 @@ We will name resources in the style of Fabric FAST: lowercase, hyphen-separated 
 | --- | --- | --- |
 | Folder | Plain display name | `Shared`, `Sandbox`, `Workloads` |
 | Project ID | `<prefix>-<env>-<purpose>-<n>` | `<prefix>-prod-iac-core-0` |
-| Bucket | `<project-id>-<purpose>` | `<prefix>-prod-iac-core-0-tf-state` |
-| Service account | `<purpose>-<ro\|rw>` for automation, `<workload>-<role>` otherwise | `iac-foundation-rw` |
+| Bucket | `<project-id>-<purpose>` | `<prefix>-prod-iac-core-0-org-state` |
+| Service account | `<purpose>-<role>`; for IaC accounts the role is `ro`, `rw`, or `cicd-<trigger>` | `iac-org-rw`, `iac-org-cicd-pr`, `iac-agent` |
 | VPC network | `<env>-<purpose>-<n>` | `prod-shared-0` |
 | Subnet | `<env>-<purpose>-<region-short>` | `dev-gke-use1` |
 | Other project-scoped resources | `<purpose>[-<region-short>]` | `nat-use1` |
