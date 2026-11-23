@@ -73,7 +73,7 @@ The stage 0 service accounts get the roles that this stage needs:
 | Account | Scope | Roles |
 | --- | --- | --- |
 | `iac-org-rw` | IaC core project | Service Account Admin, Workload Identity Pool Admin, Project IAM Admin, Service Usage Admin, Storage Admin |
-| `iac-org-rw` | Organization | Organization Role Administrator, Security Admin |
+| `iac-org-rw` | Organization | Organization Role Administrator, Project Creator, Security Admin |
 | `iac-org-ro` | IaC core project | Service Account Viewer, Workload Identity Pool Viewer, Service Usage Viewer, Storage Viewer with IAM (custom) |
 | `iac-org-ro` | Organization | Browser, Security Reviewer |
 
@@ -92,6 +92,8 @@ The accounts and principals that impersonate others get Service Account Token Cr
 `iac-agent` can't be listed in `local_plan_principals`, since it already gets its bindings, or in `local_apply_principals`. The variable validations reject it in both.
 
 On the stage's managed folder in `cicd-plans`, `iac-org-cicd-merge` gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and `iac-org-cicd-apply` gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
+
+On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account.
 
 ### Workload Identity Federation
 
@@ -128,7 +130,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 - Terraform 1.17.0 or later.
 - For plans: membership in `local_plan_principals`.
 - For applies: membership in `local_apply_principals`.
-- For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), plus Project Creator (`roles/resourcemanager.projectCreator`) on the organization and Billing Account User (`roles/billing.user`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects).
+- For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), plus Billing Account User (`roles/billing.user`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects).
 
 ## Configuration
 
@@ -212,3 +214,7 @@ terraform apply
 ```
 
 On a new organization the bucket doesn't exist yet: apply once with local state, add the backend, and run `terraform init -migrate-state`.
+
+## CI/CD
+
+Pull requests that change this stage get a plan, and merges to `main` apply it after approval. See [CI/CD](../README.md#cicd).
