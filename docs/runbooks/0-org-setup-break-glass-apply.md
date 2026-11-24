@@ -12,7 +12,7 @@ CI/CD applies stage 0, and no person can impersonate its read-write account `iac
 Grant yourself Service Account Token Creator on `iac-org-rw`:
 
 ```sh
-gcloud iam service-accounts add-iam-policy-binding iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --member user:<name>@example.com --role roles/iam.serviceAccountTokenCreator
+gcloud iam service-accounts add-iam-policy-binding iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --member user:<name>@example.com --role roles/iam.serviceAccountTokenCreator --project <prefix>-prod-iac-core-0
 ```
 
 The grant [typically takes 2 minutes to take effect, potentially 7 minutes or longer](https://docs.cloud.google.com/iam/docs/access-change-propagation).
@@ -42,5 +42,11 @@ terraform init -reconfigure
 The stage manages its bindings with non-authoritative `google_service_account_iam_member` resources, so an apply doesn't remove your grant. Remove it yourself:
 
 ```sh
-gcloud iam service-accounts remove-iam-policy-binding iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --member user:<name>@example.com --role roles/iam.serviceAccountTokenCreator
+gcloud iam service-accounts remove-iam-policy-binding iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --member user:<name>@example.com --role roles/iam.serviceAccountTokenCreator --project <prefix>-prod-iac-core-0
+```
+
+Then check that only the CI/CD apply account `iac-org-cicd-apply` still holds Service Account Token Creator on `iac-org-rw`:
+
+```sh
+gcloud iam service-accounts get-iam-policy iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
 ```
