@@ -145,6 +145,15 @@ On the stage's managed folder in `cicd-plans`, `iac-org-cicd-merge` gets Storage
 
 On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account.
 
+People get their roles through the Cloud Identity groups in `groups`. The stage binds the groups but doesn't create them:
+
+| Group | Scope | Roles |
+| --- | --- | --- |
+| `organization_admins` | Organization | Advisory Notifications Viewer and Organization Administrator |
+| `organization_admins` | Billing account | Billing Account Administrator |
+| `security_reviewers` | Organization | Security Reviewer |
+| `billing_viewers` | Billing account | Billing Account Viewer |
+
 ### Workload Identity Federation
 
 A workload identity pool `github` in the IaC core project, with an OIDC provider `github-actions` that trusts tokens from GitHub Actions (`https://token.actions.githubusercontent.com`). The provider:
@@ -178,6 +187,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
+- The groups in `groups`, created by a super admin or a Groups Admin in the Admin console or with `gcloud identity groups create`. See [Create a group in your organization](https://knowledge.workspace.google.com/admin/groups/create-a-group-in-your-organization).
 - For plans: membership in `local_plan_principals`.
 - For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), including Billing Account Administrator (`roles/billing.admin`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects) and [Cloud Billing access control](https://docs.cloud.google.com/billing/docs/how-to/billing-access).
 
@@ -186,7 +196,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 | File | Committed | Contents |
 | --- | --- | --- |
 | `terraform.tfvars` | Yes | `region`, `resource_locations`, `iac_project_services`, and `audit_logs_project_services` |
-| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, and `local_plan_principals` |
+| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `groups`, and `local_plan_principals` |
 
 Create the uncommitted file from its template and fill in the values:
 

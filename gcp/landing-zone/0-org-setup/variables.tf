@@ -53,6 +53,15 @@ variable "github_repository" {
   description = "GitHub repository that runs the CI workflows, as owner/name."
 }
 
+variable "groups" {
+  type = object({
+    billing_viewers     = string
+    organization_admins = string
+    security_reviewers  = string
+  })
+  description = "Emails of the Cloud Identity groups that get organization and billing account roles: organization_admins administer both, security_reviewers read IAM policies, and billing_viewers read billing data."
+}
+
 variable "local_plan_principals" {
   type        = set(string)
   description = "IAM principals, such as user:name@example.com, that may impersonate the read-only stage service accounts to run terraform plan locally, and issue short-lived tokens for the agent service account."
