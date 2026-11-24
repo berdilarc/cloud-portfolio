@@ -23,6 +23,11 @@ variable "region" {
   description = "Region for regional resources, such as the IaC buckets."
 }
 
+variable "resource_locations" {
+  type        = list(string)
+  description = "Locations where new resources may be created, such as in:us-locations. Sets the gcp.resourceLocations org policy."
+}
+
 variable "iac_project_services" {
   type        = set(string)
   description = "APIs to enable in the IaC core project. Removing an entry stops Terraform from managing the API but leaves it enabled."

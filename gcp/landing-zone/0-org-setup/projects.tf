@@ -9,12 +9,15 @@ locals {
   }
 }
 
+# The compute.skipDefaultNetworkCreation org policy stops the default network.
+#trivy:ignore:AVD-GCP-0010
 resource "google_project" "iac" {
-  name                = local.iac_project_id
-  project_id          = local.iac_project_id
-  org_id              = var.org_id
-  billing_account     = var.billing_account
-  auto_create_network = false
+  name            = local.iac_project_id
+  project_id      = local.iac_project_id
+  org_id          = var.org_id
+  billing_account = var.billing_account
+
+  depends_on = [google_org_policy_policy.enforced]
 }
 
 resource "google_project_service" "iac" {
@@ -25,12 +28,15 @@ resource "google_project_service" "iac" {
   disable_on_destroy = false
 }
 
+# The compute.skipDefaultNetworkCreation org policy stops the default network.
+#trivy:ignore:AVD-GCP-0010
 resource "google_project" "billing_export" {
-  name                = local.billing_export_project_id
-  project_id          = local.billing_export_project_id
-  org_id              = var.org_id
-  billing_account     = var.billing_account
-  auto_create_network = false
+  name            = local.billing_export_project_id
+  project_id      = local.billing_export_project_id
+  org_id          = var.org_id
+  billing_account = var.billing_account
+
+  depends_on = [google_org_policy_policy.enforced]
 }
 
 resource "google_project_iam_member" "billing_export" {
@@ -41,12 +47,15 @@ resource "google_project_iam_member" "billing_export" {
   member  = google_service_account.stage[each.key].member
 }
 
+# The compute.skipDefaultNetworkCreation org policy stops the default network.
+#trivy:ignore:AVD-GCP-0010
 resource "google_project" "audit_logs" {
-  name                = local.audit_logs_project_id
-  project_id          = local.audit_logs_project_id
-  org_id              = var.org_id
-  billing_account     = var.billing_account
-  auto_create_network = false
+  name            = local.audit_logs_project_id
+  project_id      = local.audit_logs_project_id
+  org_id          = var.org_id
+  billing_account = var.billing_account
+
+  depends_on = [google_org_policy_policy.enforced]
 }
 
 resource "google_project_iam_member" "audit_logs" {
