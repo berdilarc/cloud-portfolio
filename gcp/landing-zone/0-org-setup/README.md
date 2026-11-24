@@ -27,7 +27,7 @@ Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/dec
 | `<prefix>-prod-billing-export-0` | BigQuery dataset for the Cloud Billing exports |
 | `<prefix>-prod-audit-logs-0` | Audit logs of the organization |
 
-The projects are created under the organization and have no default network. The IaC core and billing export projects are linked to `billing_account`; the audit logs project isn't linked to a billing account yet. Google Cloud creates the default network with each project and Terraform deletes it right away, which enables the Compute Engine API on every project. See `auto_create_network` in the [`google_project` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project).
+The projects are created under the organization, linked to `billing_account`, and have no default network. Google Cloud creates the default network with each project and Terraform deletes it right away, which enables the Compute Engine API on every project. See `auto_create_network` in the [`google_project` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project).
 
 The stage manages only the billing export project itself. Its dataset, the exports, and their IAM bindings are configured outside Terraform.
 
