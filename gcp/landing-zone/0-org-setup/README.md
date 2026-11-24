@@ -75,6 +75,8 @@ A fourth bucket, `cicd-plans`, holds the plan files that CI/CD saves between the
 
 `stage-state` has a [managed folder](https://docs.cloud.google.com/storage/docs/managed-folders) for each later stage (`2-networking/`, `2-project-factory/`). Each stage's service accounts get access to their own folder only.
 
+`config` has a managed folder `private/` for the private inputs, so that uploading them doesn't need write access to the whole bucket.
+
 ### Service accounts
 
 Each stage has a read-write service account for `terraform apply` and a read-only one for `terraform plan`, all in the IaC core project:
@@ -139,11 +141,11 @@ The accounts and principals that impersonate others get Service Account Token Cr
 
 `iac-agent` can't be listed in `local_plan_principals`, since it already gets its bindings. The variable validation rejects it.
 
-No person gets Token Creator on a read-write account, so only CI/CD applies the stage. See [Break-glass apply](../../../docs/runbooks/0-org-setup-break-glass-apply.md) for the exception.
+No person gets Token Creator on a read-write account, so only CI/CD applies the stage. See [Break-glass apply](../../../docs/runbooks/0-org-setup-break-glass-apply.md) for the exception, and [Recovery](../../../docs/runbooks/0-org-setup-recovery.md) for when a change breaks the accounts that CI/CD applies with.
 
 On the stage's managed folder in `cicd-plans`, `iac-org-cicd-merge` gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and `iac-org-cicd-apply` gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
 
-On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account.
+On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account. On its `private/` managed folder, `private_input_principals` get Storage Object User (`roles/storage.objectUser`) to upload the private inputs.
 
 People get their roles through the Cloud Identity groups in `groups`. The stage binds the groups but doesn't create them:
 
@@ -189,6 +191,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 - Terraform 1.17.0 or later.
 - The groups in `groups`, created by a super admin or a Groups Admin in the Admin console or with `gcloud identity groups create`. See [Create a group in your organization](https://knowledge.workspace.google.com/admin/groups/create-a-group-in-your-organization).
 - For plans: membership in `local_plan_principals`.
+- For uploading the private inputs: membership in `private_input_principals`.
 - For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), including Billing Account Administrator (`roles/billing.admin`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects) and [Cloud Billing access control](https://docs.cloud.google.com/billing/docs/how-to/billing-access).
 
 ## Configuration
@@ -196,7 +199,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 | File | Committed | Contents |
 | --- | --- | --- |
 | `terraform.tfvars` | Yes | `region`, `resource_locations`, `iac_project_services`, and `audit_logs_project_services` |
-| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `groups`, and `local_plan_principals` |
+| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `groups`, `local_plan_principals`, and `private_input_principals` |
 
 Create the uncommitted file from its template and fill in the values:
 
@@ -225,10 +228,10 @@ gh api repos/<owner>/<repository> --jq '.id, .owner.id'
 
 ## Running
 
-The state is in the `org-state` bucket. To plan as `iac-org-ro`:
+The state is in the `org-state` bucket. To plan as `iac-org-ro`, download its providers file as `iac-org-ro` too:
 
 ```sh
-gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf .
+gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf . --impersonate-service-account iac-org-ro@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
 terraform init
 terraform plan -lock=false
 ```
