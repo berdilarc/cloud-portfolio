@@ -1,4 +1,6 @@
 locals {
+  org_policy_prefix = "${local.org_name}/policies"
+
   enforced_org_policies = toset([
     "compute.managed.requireOsLogin",
     "compute.skipDefaultNetworkCreation",
@@ -10,14 +12,14 @@ locals {
 }
 
 data "google_organization" "this" {
-  organization = "organizations/${var.org_id}"
+  organization = local.org_name
 }
 
 resource "google_org_policy_policy" "enforced" {
   for_each = local.enforced_org_policies
 
-  name   = "organizations/${var.org_id}/policies/${each.key}"
-  parent = "organizations/${var.org_id}"
+  name   = "${local.org_policy_prefix}/${each.key}"
+  parent = local.org_name
 
   spec {
     rules {
@@ -27,8 +29,8 @@ resource "google_org_policy_policy" "enforced" {
 }
 
 resource "google_org_policy_policy" "protocol_forwarding" {
-  name   = "organizations/${var.org_id}/policies/compute.managed.restrictProtocolForwardingCreationForTypes"
-  parent = "organizations/${var.org_id}"
+  name   = "${local.org_policy_prefix}/compute.managed.restrictProtocolForwardingCreationForTypes"
+  parent = local.org_name
 
   spec {
     rules {
@@ -41,8 +43,8 @@ resource "google_org_policy_policy" "protocol_forwarding" {
 }
 
 resource "google_org_policy_policy" "contact_domains" {
-  name   = "organizations/${var.org_id}/policies/essentialcontacts.managed.allowedContactDomains"
-  parent = "organizations/${var.org_id}"
+  name   = "${local.org_policy_prefix}/essentialcontacts.managed.allowedContactDomains"
+  parent = local.org_name
 
   spec {
     rules {
@@ -55,8 +57,8 @@ resource "google_org_policy_policy" "contact_domains" {
 }
 
 resource "google_org_policy_policy" "member_domains" {
-  name   = "organizations/${var.org_id}/policies/iam.allowedPolicyMemberDomains"
-  parent = "organizations/${var.org_id}"
+  name   = "${local.org_policy_prefix}/iam.allowedPolicyMemberDomains"
+  parent = local.org_name
 
   spec {
     rules {
@@ -68,8 +70,8 @@ resource "google_org_policy_policy" "member_domains" {
 }
 
 resource "google_org_policy_policy" "resource_locations" {
-  name   = "organizations/${var.org_id}/policies/gcp.resourceLocations"
-  parent = "organizations/${var.org_id}"
+  name   = "${local.org_policy_prefix}/gcp.resourceLocations"
+  parent = local.org_name
 
   spec {
     rules {
@@ -81,8 +83,8 @@ resource "google_org_policy_policy" "resource_locations" {
 }
 
 resource "google_org_policy_policy" "credential_lifetime" {
-  name   = "organizations/${var.org_id}/policies/iam.allowServiceAccountCredentialLifetimeExtension"
-  parent = "organizations/${var.org_id}"
+  name   = "${local.org_policy_prefix}/iam.allowServiceAccountCredentialLifetimeExtension"
+  parent = local.org_name
 
   spec {
     rules {
