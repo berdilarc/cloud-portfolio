@@ -6,9 +6,9 @@
 
 <!-- The problem or goal this addresses. -->
 
-## IAM and manual steps
+## Manual steps
 
-<!-- Grants, uploads, or console steps done by hand before or after the merge, or "None". -->
+<!-- Grants, uploads, or console steps done by hand before or after the merge. Delete this section if there are none. -->
 
 ## How to verify
 
