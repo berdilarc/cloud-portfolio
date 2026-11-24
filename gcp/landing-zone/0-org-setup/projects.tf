@@ -45,6 +45,7 @@ resource "google_project" "audit_logs" {
   name                = local.audit_logs_project_id
   project_id          = local.audit_logs_project_id
   org_id              = var.org_id
+  billing_account     = var.billing_account
   auto_create_network = false
 }
 
