@@ -112,11 +112,6 @@ resource "google_organization_iam_custom_role" "stage" {
   permissions = each.value.permissions
 }
 
-moved {
-  from = google_organization_iam_custom_role.storage_viewer
-  to   = google_organization_iam_custom_role.stage["storage_viewer"]
-}
-
 resource "google_organization_iam_member" "stage" {
   for_each = local.org_bindings
 

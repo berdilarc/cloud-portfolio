@@ -16,6 +16,13 @@ locals {
     })
     "0-org-setup" = jsonencode({
       custom_roles = { for key, role in google_organization_iam_custom_role.stage : key => role.name }
+      folder_ids = merge(
+        {
+          "networking" = google_folder.networking.name
+          "teams"      = google_folder.teams.name
+        },
+        { for key, folder in google_folder.networking_environment : "networking/${key}" => folder.name },
+      )
       project_ids = {
         "billing-export" = google_project.billing_export.project_id
         "iac-core"       = google_project.iac.project_id

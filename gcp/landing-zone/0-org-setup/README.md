@@ -1,12 +1,25 @@
 # 0-org-setup
 
-The first landing zone stage. It manages the projects that the rest of the landing zone depends on, the state buckets and service accounts of every stage, and lets GitHub Actions authenticate to Google Cloud without keys.
+The first landing zone stage. It manages the folders and projects that the rest of the landing zone depends on, the state buckets and service accounts of every stage, and lets GitHub Actions authenticate to Google Cloud without keys.
 
 ## What it manages
 
-Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/decisions/0001-name-resources-with-prefix-environment-purpose-counter.md). Each project's display name equals its project ID.
+### Folders
+
+Two top-level folders under the organization, Networking and Teams. Networking has a Development and a Production folder:
+
+| Folder | Key in `folder_ids` | Holds |
+| --- | --- | --- |
+| `Networking` | `networking` | `2-networking` projects shared by all environments |
+| `Networking/Development` | `networking/dev` | `2-networking` development projects |
+| `Networking/Production` | `networking/prod` | `2-networking` production projects |
+| `Teams` | `teams` | Team folders and workload projects from `2-project-factory` |
+
+The folders keep the provider's default `deletion_protection`, so Terraform refuses to delete one until it's set to `false`. See the [`google_folder` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_folder).
 
 ### Projects
+
+Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/decisions/0001-name-resources-with-prefix-environment-purpose-counter.md). Each project's display name equals its project ID.
 
 | Project | Purpose |
 | --- | --- |
@@ -128,7 +141,7 @@ The stage writes these files to the `config` bucket:
 | `providers/<stage>-providers.tf` | gcs backend and `google` provider, both impersonating the stage's read-write account |
 | `providers/<stage>-ro-providers.tf` | The same for the read-only account |
 | `tfvars/0-globals.auto.tfvars.json` | Billing account, organization, prefix, and region |
-| `tfvars/0-org-setup.auto.tfvars.json` | Custom roles, project IDs, service accounts, buckets, and the workload identity provider |
+| `tfvars/0-org-setup.auto.tfvars.json` | Custom roles, folder IDs, project IDs, service accounts, buckets, and the workload identity provider |
 
 A stage copies the files it needs into its directory. They hold identifiers, so `.gitignore` keeps them out of the repository.
 
