@@ -17,6 +17,28 @@ Two top-level folders under the organization, Networking and Teams. Networking h
 
 The folders keep the provider's default `deletion_protection`, so Terraform refuses to delete one until it's set to `false`. See the [`google_folder` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_folder).
 
+### Org policies
+
+The organization gets these policies. Managed constraints, with `managed` in their name, are used where they exist, because they support dry run. See [Organization policy constraints](https://docs.cloud.google.com/organization-policy/reference/org-policy-constraints).
+
+| Constraint | Policy |
+| --- | --- |
+| `compute.managed.requireOsLogin` | Enforced: VMs must use OS Login |
+| `compute.managed.restrictProtocolForwardingCreationForTypes` | Enforced: only internal forwarding rules |
+| `compute.skipDefaultNetworkCreation` | Enforced: new projects get no default network |
+| `essentialcontacts.managed.allowedContactDomains` | Enforced: Essential Contacts only in the organization's domain |
+| `gcp.resourceLocations` | Allows only `resource_locations` for new resources |
+| `iam.allowedPolicyMemberDomains` | Allows only identities from the organization's Cloud Identity or Google Workspace account in IAM policies |
+| `iam.allowServiceAccountCredentialLifetimeExtension` | Allows `iac-agent` access tokens that last up to 12 hours |
+| `iam.automaticIamGrantsForDefaultServiceAccounts` | Enforced: default service accounts get no Editor role |
+| `iam.disableServiceAccountKeyUpload` | Enforced |
+| `iam.managed.disableServiceAccountKeyCreation` | Enforced |
+| `storage.uniformBucketLevelAccess` | Enforced |
+
+The organization's domain and customer ID are read from the organization. A policy applies only to resources created after it's set.
+
+Organizations created on or after May 3, 2024 already enforce seven of these policies. See [Secure by default organizations](https://docs.cloud.google.com/resource-manager/docs/secure-by-default-organizations). On such an organization, import those policies before the first apply, because creating a policy that already exists fails with `409 Conflict`.
+
 ### Projects
 
 Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/decisions/0001-name-resources-with-prefix-environment-purpose-counter.md). Each project's display name equals its project ID.
@@ -27,7 +49,7 @@ Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/dec
 | `<prefix>-prod-billing-export-0` | BigQuery dataset for the Cloud Billing exports |
 | `<prefix>-prod-audit-logs-0` | Audit logs of the organization |
 
-The projects are created under the organization, linked to `billing_account`, and have no default network. Google Cloud creates the default network with each project and Terraform deletes it right away, which enables the Compute Engine API on every project. See `auto_create_network` in the [`google_project` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project).
+The projects are created under the organization and linked to `billing_account`. They are created after the org policies, so they get no default network.
 
 The stage manages only the billing export project itself. Its dataset, the exports, and their IAM bindings are configured outside Terraform.
 
@@ -163,7 +185,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 
 | File | Committed | Contents |
 | --- | --- | --- |
-| `terraform.tfvars` | Yes | `region`, `iac_project_services`, and `audit_logs_project_services` |
+| `terraform.tfvars` | Yes | `region`, `resource_locations`, `iac_project_services`, and `audit_logs_project_services` |
 | `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, and `local_plan_principals` |
 
 Create the uncommitted file from its template and fill in the values:
@@ -201,10 +223,10 @@ terraform init
 terraform plan -lock=false
 ```
 
-To give a coding agent plan access, mint a short-lived token for `iac-agent` and pass it to the agent in the `GOOGLE_OAUTH_ACCESS_TOKEN` environment variable. With that token, the read-only providers file impersonates `iac-org-ro`:
+To give a coding agent plan access, mint a short-lived token for `iac-agent` and pass it to the agent in the `GOOGLE_OAUTH_ACCESS_TOKEN` environment variable. With that token, the read-only providers file impersonates `iac-org-ro`. The token lasts for `--lifetime` seconds, up to 43200 (12 hours):
 
 ```sh
-gcloud auth print-access-token --impersonate-service-account iac-agent@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
+gcloud auth print-access-token --impersonate-service-account iac-agent@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --lifetime 28800
 ```
 
 To apply with your own credentials, as for the first apply, use a backend without impersonation instead of the providers file, for example a `backend.tf` that isn't committed:

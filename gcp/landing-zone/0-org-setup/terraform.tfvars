@@ -1,5 +1,9 @@
 region = "us-east1"
 
+resource_locations = [
+  "in:us-locations",
+]
+
 iac_project_services = [
   "cloudbilling.googleapis.com",
   "cloudresourcemanager.googleapis.com",
