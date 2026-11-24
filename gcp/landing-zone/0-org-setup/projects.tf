@@ -1,6 +1,11 @@
 locals {
   iac_project_id            = "${var.prefix}-prod-iac-core-0"
   billing_export_project_id = "${var.prefix}-prod-billing-export-0"
+
+  basic_project_roles = {
+    "iac-org-rw" = "roles/owner"
+    "iac-org-ro" = "roles/viewer"
+  }
 }
 
 resource "google_project" "iac" {
@@ -25,4 +30,12 @@ resource "google_project" "billing_export" {
   org_id              = var.org_id
   billing_account     = var.billing_account
   auto_create_network = false
+}
+
+resource "google_project_iam_member" "billing_export" {
+  for_each = local.basic_project_roles
+
+  project = google_project.billing_export.project_id
+  role    = each.value
+  member  = google_service_account.stage[each.key].member
 }

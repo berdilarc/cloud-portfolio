@@ -22,12 +22,14 @@ locals {
     "iac-org-rw" = [
       "roles/iam.serviceAccountAdmin",
       "roles/iam.workloadIdentityPoolAdmin",
+      "roles/owner",
       "roles/serviceusage.serviceUsageAdmin",
       "roles/storage.admin",
     ]
     "iac-org-ro" = [
       "roles/iam.serviceAccountViewer",
       "roles/iam.workloadIdentityPoolViewer",
+      "roles/viewer",
     ]
   }
 

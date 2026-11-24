@@ -74,22 +74,27 @@ Each stage with CI/CD enabled (only `0-org-setup` so far) has three CI/CD accoun
 
 ### IAM
 
-The later stages' service accounts get only their state access from this stage, on their managed folder:
+The later stages' service accounts get these roles from this stage:
 
-| Mode | Role |
-| --- | --- |
-| Read-write | Storage Object User (`roles/storage.objectUser`) |
-| Read-only | Storage Object Viewer (`roles/storage.objectViewer`) |
+| Mode | Scope | Role |
+| --- | --- | --- |
+| Read-write | Their managed folder in `stage-state` | Storage Object User (`roles/storage.objectUser`) |
+| Read-only | Their managed folder in `stage-state` | Storage Object Viewer (`roles/storage.objectViewer`) |
+| Read-write | Billing account | Billing Account User (`roles/billing.user`) |
 
 The read-only accounts can't write the state lock, so their plans run with `-lock=false`.
 
-The stage 0 service accounts get the roles below. At organization level these are the roles that [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/blob/v60.0.0/fast/stages/0-org-setup/datasets/classic/organization/.config.yaml) grants, so the stage can manage a new type of organization resource without first granting itself a role.
+The stage 0 service accounts get the roles below. They follow the roles that [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic) grants on the organization, its projects, and the billing account, so the stage can manage a new type of resource without first granting itself a role.
 
 | Account | Scope | Roles |
 | --- | --- | --- |
-| `iac-org-rw` | IaC core project | Service Account Admin, Workload Identity Pool Admin, Service Usage Admin, Storage Admin |
+| `iac-org-rw` | IaC core project | Owner, Service Account Admin, Workload Identity Pool Admin, Service Usage Admin, Storage Admin |
+| `iac-org-rw` | Billing export project | Owner |
+| `iac-org-rw` | Billing account | Billing Account Administrator |
 | `iac-org-rw` | Organization | Access Context Manager Admin, Cloud Asset Viewer, Essential Contacts Admin, Folder Admin, IAM Workforce Pool Admin, Logging Admin, Organization Administrator, Organization Policy Administrator, Organization Role Administrator, Project Creator, Project Mover, Tag Administrator, Tag User |
-| `iac-org-ro` | IaC core project | Service Account Viewer, Workload Identity Pool Viewer, Storage Viewer with IAM (custom) |
+| `iac-org-ro` | IaC core project | Viewer, Service Account Viewer, Workload Identity Pool Viewer, Storage Viewer with IAM (custom) |
+| `iac-org-ro` | Billing export project | Viewer |
+| `iac-org-ro` | Billing account | Billing Account Viewer |
 | `iac-org-ro` | Organization | Cloud Asset Viewer, Essential Contacts Viewer, Folder Viewer, IAM Workforce Pool Viewer, Logs Viewer, Organization Admin Viewer (custom), Organization Policy Viewer, Organization Role Viewer, Service Usage Viewer, Tag Viewer, Tag Viewer with IAM (custom) |
 
 The custom roles are defined on the organization, with the permissions of FAST's roles of the same name:
@@ -151,7 +156,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 
 - Terraform 1.17.0 or later.
 - For plans: membership in `local_plan_principals`.
-- For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), plus Billing Account User (`roles/billing.user`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects).
+- For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), including Billing Account Administrator (`roles/billing.admin`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects) and [Cloud Billing access control](https://docs.cloud.google.com/billing/docs/how-to/billing-access).
 
 ## Configuration
 
