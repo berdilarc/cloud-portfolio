@@ -23,16 +23,17 @@ Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/dec
 
 | Project | Purpose |
 | --- | --- |
-| `<prefix>-prod-iac-core-0` | Infrastructure as code: state buckets, stage service accounts, Workload Identity Federation for CI |
+| `<prefix>-prod-iac-core-0` | Infrastructure as code: state buckets, stage service accounts, and Workload Identity Federation for CI |
 | `<prefix>-prod-billing-export-0` | BigQuery dataset for the Cloud Billing exports |
+| `<prefix>-prod-audit-logs-0` | Audit logs of the organization |
 
-Both projects are created under the organization, linked to `billing_account`, and have no default network. Google Cloud creates the default network with the project and Terraform deletes it right away, which enables the Compute Engine API on both projects. See `auto_create_network` in the [`google_project` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project).
+The projects are created under the organization, linked to `billing_account`, and have no default network. Google Cloud creates the default network with each project and Terraform deletes it right away, which enables the Compute Engine API on every project. See `auto_create_network` in the [`google_project` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project).
 
 The stage manages only the billing export project itself. Its dataset, the exports, and their IAM bindings are configured outside Terraform.
 
 ### APIs
 
-The APIs listed in `iac_project_services` in `terraform.tfvars` are enabled in the IaC core project. Removing an API from the list stops Terraform from managing it but leaves it enabled.
+The APIs listed in `terraform.tfvars` are enabled in the IaC core project (`iac_project_services`) and the audit logs project (`audit_logs_project_services`). Removing an API from a list stops Terraform from managing it but leaves it enabled.
 
 The stage service accounts live in the IaC core project, so it is the quota project for their API calls: an API that Terraform calls, such as the Cloud Billing API for project billing links, must be enabled there. See [How the quota project is determined](https://docs.cloud.google.com/docs/quotas/quota-project).
 
@@ -88,14 +89,14 @@ The stage 0 service accounts get the roles below. They follow the roles that [FA
 
 | Account | Scope | Roles |
 | --- | --- | --- |
-| `iac-org-rw` | IaC core project | Owner, Service Account Admin, Workload Identity Pool Admin, Service Usage Admin, Storage Admin |
-| `iac-org-rw` | Billing export project | Owner |
+| `iac-org-rw` | IaC core project | Owner, Service Account Admin, Workload Identity Pool Admin, Service Usage Admin, and Storage Admin |
+| `iac-org-rw` | Billing export and audit logs projects | Owner |
 | `iac-org-rw` | Billing account | Billing Account Administrator |
-| `iac-org-rw` | Organization | Access Context Manager Admin, Cloud Asset Viewer, Essential Contacts Admin, Folder Admin, IAM Workforce Pool Admin, Logging Admin, Organization Administrator, Organization Policy Administrator, Organization Role Administrator, Project Creator, Project Mover, Tag Administrator, Tag User |
-| `iac-org-ro` | IaC core project | Viewer, Service Account Viewer, Workload Identity Pool Viewer, Storage Viewer with IAM (custom) |
-| `iac-org-ro` | Billing export project | Viewer |
+| `iac-org-rw` | Organization | Access Context Manager Admin, Cloud Asset Viewer, Essential Contacts Admin, Folder Admin, IAM Workforce Pool Admin, Logging Admin, Organization Administrator, Organization Policy Administrator, Organization Role Administrator, Project Creator, Project Mover, Tag Administrator, and Tag User |
+| `iac-org-ro` | IaC core project | Viewer, Service Account Viewer, Workload Identity Pool Viewer, and Storage Viewer with IAM (custom) |
+| `iac-org-ro` | Billing export and audit logs projects | Viewer |
 | `iac-org-ro` | Billing account | Billing Account Viewer |
-| `iac-org-ro` | Organization | Cloud Asset Viewer, Essential Contacts Viewer, Folder Viewer, IAM Workforce Pool Viewer, Logs Viewer, Organization Admin Viewer (custom), Organization Policy Viewer, Organization Role Viewer, Service Usage Viewer, Tag Viewer, Tag Viewer with IAM (custom) |
+| `iac-org-ro` | Organization | Cloud Asset Viewer, Essential Contacts Viewer, Folder Viewer, IAM Workforce Pool Viewer, Logs Viewer, Organization Admin Viewer (custom), Organization Policy Viewer, Organization Role Viewer, Service Usage Viewer, Tag Viewer, and Tag Viewer with IAM (custom) |
 
 The custom roles are defined on the organization, with the permissions of FAST's roles of the same name:
 
@@ -111,7 +112,7 @@ The accounts and principals that impersonate others get Service Account Token Cr
 | --- | --- |
 | `local_plan_principals` | Every read-only account and `iac-agent` |
 | `iac-agent` | Every read-only account |
-| `iac-org-cicd-pr`, `iac-org-cicd-merge` | `iac-org-ro` |
+| `iac-org-cicd-pr` and `iac-org-cicd-merge` | `iac-org-ro` |
 | `iac-org-cicd-apply` | `iac-org-rw` |
 
 `iac-agent` can't be listed in `local_plan_principals`, since it already gets its bindings. The variable validation rejects it.
@@ -162,8 +163,8 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 
 | File | Committed | Contents |
 | --- | --- | --- |
-| `terraform.tfvars` | Yes | `region`, `iac_project_services` |
-| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `local_plan_principals` |
+| `terraform.tfvars` | Yes | `region`, `iac_project_services`, and `audit_logs_project_services` |
+| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, and `local_plan_principals` |
 
 Create the uncommitted file from its template and fill in the values:
 
