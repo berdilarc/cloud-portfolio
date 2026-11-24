@@ -7,7 +7,7 @@ locals {
 
 resource "google_folder" "networking" {
   display_name = "Networking"
-  parent       = "organizations/${var.org_id}"
+  parent       = local.org_name
 }
 
 resource "google_folder" "networking_environment" {
@@ -19,5 +19,5 @@ resource "google_folder" "networking_environment" {
 
 resource "google_folder" "teams" {
   display_name = "Teams"
-  parent       = "organizations/${var.org_id}"
+  parent       = local.org_name
 }

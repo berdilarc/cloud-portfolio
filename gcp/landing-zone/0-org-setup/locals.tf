@@ -1,4 +1,6 @@
 locals {
+  org_name = "organizations/${var.org_id}"
+
   stages = {
     "0-org-setup" = {
       name        = "org setup"
