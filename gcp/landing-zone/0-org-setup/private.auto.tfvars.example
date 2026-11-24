@@ -15,3 +15,7 @@ groups = {
 local_plan_principals = [
   "user:<name>@example.com",
 ]
+
+private_input_principals = [
+  "user:<name>@example.com",
+]

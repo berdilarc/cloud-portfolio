@@ -72,3 +72,9 @@ variable "local_plan_principals" {
     error_message = "The agent service account already gets its plan bindings, so it can't be a local plan principal."
   }
 }
+
+variable "private_input_principals" {
+  type        = set(string)
+  description = "IAM principals, such as user:name@example.com, that may upload the stages' private inputs to the private/ managed folder in the config bucket."
+  default     = []
+}
