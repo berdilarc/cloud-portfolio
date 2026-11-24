@@ -53,6 +53,20 @@ resource "google_storage_bucket_iam_member" "config_cicd" {
   member = google_service_account.cicd[each.key].member
 }
 
+resource "google_storage_managed_folder" "config_private" {
+  bucket = google_storage_bucket.iac["config"].name
+  name   = "private/"
+}
+
+resource "google_storage_managed_folder_iam_member" "config_private" {
+  for_each = var.private_input_principals
+
+  bucket         = google_storage_managed_folder.config_private.bucket
+  managed_folder = google_storage_managed_folder.config_private.name
+  role           = "roles/storage.objectUser"
+  member         = each.key
+}
+
 resource "google_storage_managed_folder" "stage_state" {
   for_each = local.managed_folder_stages
 
