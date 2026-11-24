@@ -28,6 +28,11 @@ variable "iac_project_services" {
   description = "APIs to enable in the IaC core project. Removing an entry stops Terraform from managing the API but leaves it enabled."
 }
 
+variable "audit_logs_project_services" {
+  type        = set(string)
+  description = "APIs to enable in the audit logs project. Removing an entry stops Terraform from managing the API but leaves it enabled."
+}
+
 variable "github_repository_id" {
   type        = string
   description = "Numeric ID of the GitHub repository. Only tokens issued to this repository are accepted."

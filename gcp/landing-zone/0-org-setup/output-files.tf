@@ -24,6 +24,7 @@ locals {
         { for key, folder in google_folder.networking_environment : "networking/${key}" => folder.name },
       )
       project_ids = {
+        "audit-logs"     = google_project.audit_logs.project_id
         "billing-export" = google_project.billing_export.project_id
         "iac-core"       = google_project.iac.project_id
       }

@@ -8,3 +8,7 @@ iac_project_services = [
   "storage.googleapis.com",
   "sts.googleapis.com",
 ]
+
+audit_logs_project_services = [
+  "logging.googleapis.com",
+]
