@@ -3,20 +3,17 @@ locals {
     for id, sa in local.stage_service_accounts : id if sa.mode == "ro"
   ])
 
-  local_plan_bindings = merge(
-    {
-      for pair in setproduct(local.ro_service_accounts, var.local_plan_principals) : "${pair[0]} ${pair[1]}" => {
-        service_account = pair[0]
-        member          = pair[1]
-      }
-    },
-    {
-      for sa in local.ro_service_accounts : "${sa} agent" => {
-        service_account = sa
-        member          = google_service_account.agent.member
-      }
-    },
-  )
+  local_plan_members = {
+    agent         = google_service_account.agent.member
+    iac_operators = "group:${var.groups.iac_operators}"
+  }
+
+  local_plan_bindings = {
+    for pair in setproduct(local.ro_service_accounts, keys(local.local_plan_members)) : "${pair[0]} ${pair[1]}" => {
+      service_account = pair[0]
+      member          = local.local_plan_members[pair[1]]
+    }
+  }
 
   iac_project_roles = {
     "iac-org-rw" = [
@@ -74,11 +71,9 @@ resource "google_service_account" "agent" {
 }
 
 resource "google_service_account_iam_member" "agent" {
-  for_each = var.local_plan_principals
-
   service_account_id = google_service_account.agent.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = each.key
+  member             = "group:${var.groups.iac_operators}"
 }
 
 resource "google_project_iam_member" "iac" {

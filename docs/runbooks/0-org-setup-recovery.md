@@ -6,8 +6,8 @@ CI/CD applies stage 0 as `iac-org-rw`. If a change deletes or disables that acco
 
 | Person | Roles | Does |
 | --- | --- | --- |
-| A member of `organization_admins` | Organization Administrator on the organization and Billing Account Administrator on the billing account, through the group | Grants and removes the temporary roles, and grants back lost organization and project roles |
-| The operator, who can be the same admin | The temporary roles of the case, and membership in `local_plan_principals` | Runs the gcloud and Terraform steps |
+| A member of `organization_admins` | Organization Administrator on the organization and Billing Account Administrator on the billing account, through the group | Grants and removes the temporary roles, and grants back lost organization, project, and billing account roles |
+| The operator, who can be the same admin | The temporary roles of the case, and membership in `iac_operators` | Runs the gcloud and Terraform steps |
 
 Organization Administrator includes `resourcemanager.organizations.setIamPolicy` and `resourcemanager.projects.setIamPolicy`, but no service account permissions. So the admin grants project-level roles, such as Service Account Admin on the IaC core project, and the operator works on the accounts with them. See [Resource Manager roles](https://docs.cloud.google.com/iam/docs/roles-permissions/resourcemanager#resourcemanager.organizationAdmin).
 
@@ -57,13 +57,14 @@ Temporary role: Service Account Admin on the IaC core project. It includes `iam.
 gcloud iam service-accounts enable iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --project <prefix>-prod-iac-core-0
 ```
 
-### `iac-org-rw` lost a role on a project or the organization
+### `iac-org-rw` lost a role on a project, the organization, or the billing account
 
 No temporary role is needed. The admin grants the role back:
 
 ```sh
 gcloud projects add-iam-policy-binding <project-id> --member serviceAccount:iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --role <role>
-gcloud organizations add-iam-policy-binding <organization-id> --member serviceAccount:iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --role <role>
+gcloud organizations add-iam-policy-binding <org_id> --member serviceAccount:iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --role <role>
+gcloud billing accounts add-iam-policy-binding <billing_account> --member serviceAccount:iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com --role roles/billing.admin
 ```
 
 The stage README lists the roles under [IAM](../../gcp/landing-zone/0-org-setup/README.md#iam).

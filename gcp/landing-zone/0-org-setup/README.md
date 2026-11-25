@@ -15,7 +15,7 @@ Two top-level folders under the organization, Networking and Teams. Networking h
 | `Networking/Production` | `networking/prod` | `2-networking` production projects |
 | `Teams` | `teams` | Team folders and workload projects from `2-project-factory` |
 
-The folders keep the provider's default `deletion_protection`, so Terraform refuses to delete one until it's set to `false`. See the [`google_folder` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_folder).
+The folders are created after the organization's logging settings, so their `_Default` and `_Required` log buckets are in `region`. They keep the provider's default `deletion_protection`, so Terraform refuses to delete one until it's set to `false`. See the [`google_folder` resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_folder).
 
 ### Org policies
 
@@ -49,7 +49,7 @@ Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/dec
 | `<prefix>-prod-billing-export-0` | BigQuery dataset for the Cloud Billing exports |
 | `<prefix>-prod-audit-logs-0` | Audit logs of the organization |
 
-The projects are created under the organization and linked to `billing_account`. They are created after the org policies, so they get no default network.
+The projects are created under the organization and linked to `billing_account`. They are created after the org policies, so they get no default network, and after the organization's logging settings, so their `_Default` and `_Required` log buckets are in `region`.
 
 The stage manages only the billing export project itself. Its dataset, the exports, and their IAM bindings are configured outside Terraform.
 
@@ -134,18 +134,16 @@ The accounts and principals that impersonate others get Service Account Token Cr
 
 | Principal | Token Creator on |
 | --- | --- |
-| `local_plan_principals` | Every read-only account and `iac-agent` |
+| `iac_operators` group | Every read-only account and `iac-agent` |
 | `iac-agent` | Every read-only account |
 | `iac-org-cicd-pr` and `iac-org-cicd-merge` | `iac-org-ro` |
 | `iac-org-cicd-apply` | `iac-org-rw` |
-
-`iac-agent` can't be listed in `local_plan_principals`, since it already gets its bindings. The variable validation rejects it.
 
 No person gets Token Creator on a read-write account, so only CI/CD applies the stage. See [Break-glass apply](../../../docs/runbooks/0-org-setup-break-glass-apply.md) for the exception, and [Recovery](../../../docs/runbooks/0-org-setup-recovery.md) for when a change breaks the accounts that CI/CD applies with.
 
 On the stage's managed folder in `cicd-plans`, `iac-org-cicd-merge` gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and `iac-org-cicd-apply` gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
 
-On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account. On its `private/` managed folder, `private_input_principals` get Storage Object User (`roles/storage.objectUser`) to upload the private inputs.
+On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account. On its `private/` managed folder, the `iac_operators` group gets Storage Object User (`roles/storage.objectUser`) to upload the private inputs.
 
 People get their roles through the Cloud Identity groups in `groups`. The stage binds the groups but doesn't create them:
 
@@ -153,8 +151,13 @@ People get their roles through the Cloud Identity groups in `groups`. The stage 
 | --- | --- | --- |
 | `organization_admins` | Organization | Advisory Notifications Viewer and Organization Administrator |
 | `organization_admins` | Billing account | Billing Account Administrator |
-| `security_reviewers` | Organization | Security Reviewer |
-| `billing_viewers` | Billing account | Billing Account Viewer |
+| `iac_operators` | Read-only stage accounts and `iac-agent` | Service Account Token Creator |
+| `iac_operators` | `private/` managed folder in `config` | Storage Object User |
+| `auditors` | Organization | Security Reviewer |
+| `auditors` | Billing account | Billing Account Viewer |
+| `auditors` | Audit logs project | Private Logs Viewer, BigQuery Data Viewer, and BigQuery Job User |
+
+The groups split people by what they can affect: organization admins change the organization and billing, which CI/CD normally does for them; IaC operators influence what Terraform does, through plans and private inputs, but can't apply; auditors only read.
 
 ### Data Access audit logs
 
@@ -185,6 +188,8 @@ The log buckets are in `region`, keep entries for 30 days, and are upgraded to L
 
 All sinks of the organization write as one Google-managed service account, their writer identity. It gets Logs Bucket Writer on the audit logs project, conditioned on each sink's bucket, and BigQuery Data Editor on the dataset.
 
+Reading a user-defined log bucket goes through its log views, which needs `logging.views.access`: Private Logs Viewer (`roles/logging.privateLogViewer`) and Logs View Accessor have it, but Logs Viewer and Security Reviewer don't. The `auditors` group gets Private Logs Viewer on the audit logs project, which also covers the Data Access entries in the `iam` bucket, and BigQuery roles to query the dataset. See [Log views](https://docs.cloud.google.com/logging/docs/logs-views).
+
 The stage also sets the organization's default storage location for logs to `region`, so projects created from then on get their `_Default` and `_Required` buckets there instead of in `global`.
 
 See [Create an aggregated sink](https://docs.cloud.google.com/logging/docs/export/aggregated_sinks), [Route logs to supported destinations](https://docs.cloud.google.com/logging/docs/export/configure_export_v2), and [Configure default settings for organizations and folders](https://docs.cloud.google.com/logging/docs/default-settings).
@@ -196,13 +201,13 @@ A workload identity pool `github` in the IaC core project, with an OIDC provider
 - accepts a token only if its `repository_id` and `repository_owner_id` claims match `github_repository_id` and `github_repository_owner_id`. [Google recommends the numeric IDs](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) because names can be claimed by someone else after a rename or deletion, and IDs are never reused;
 - maps the token's `sub` claim to `google.subject`. See [GitHub's example subject claims](https://docs.github.com/en/actions/reference/security/oidc#example-subject-claims).
 
-Workflows impersonate the CI/CD accounts with Workload Identity User (`roles/iam.workloadIdentityUser`), granted per subject. The subjects use GitHub's immutable format, which adds the owner and repository IDs to the names. [GitHub uses it for repositories created after July 15, 2026](https://docs.github.com/en/actions/reference/security/oidc), so the stage builds the prefix from `github_repository`, `github_repository_owner_id`, and `github_repository_id`:
+Workflows impersonate the CI/CD accounts with Workload Identity User (`roles/iam.workloadIdentityUser`), granted per subject. The subjects use GitHub's immutable format, which adds the owner and repository IDs to the names. [GitHub uses it for repositories created after July 15, 2026](https://docs.github.com/en/actions/reference/security/oidc), so the stage builds the prefix from `github_repository`, `github_repository_owner_id`, and `github_repository_id`. `<owner>` and `<repository-name>` are the two parts of `github_repository`:
 
 | Subject | Account |
 | --- | --- |
-| `repo:<owner>@<owner-id>/<repository>@<repository-id>:pull_request` | `iac-org-cicd-pr` |
-| `repo:<owner>@<owner-id>/<repository>@<repository-id>:ref:refs/heads/main` | `iac-org-cicd-merge` |
-| `repo:<owner>@<owner-id>/<repository>@<repository-id>:environment:0-org-setup` | `iac-org-cicd-apply` |
+| `repo:<owner>@<github_repository_owner_id>/<repository-name>@<github_repository_id>:pull_request` | `iac-org-cicd-pr` |
+| `repo:<owner>@<github_repository_owner_id>/<repository-name>@<github_repository_id>:ref:refs/heads/main` | `iac-org-cicd-merge` |
+| `repo:<owner>@<github_repository_owner_id>/<repository-name>@<github_repository_id>:environment:0-org-setup` | `iac-org-cicd-apply` |
 
 The stage accounts have no Workload Identity User bindings. A workflow reaches them only through its CI/CD account.
 
@@ -223,8 +228,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 
 - Terraform 1.17.0 or later.
 - The groups in `groups`, created by a super admin or a Groups Admin in the Admin console or with `gcloud identity groups create`. See [Create a group in your organization](https://knowledge.workspace.google.com/admin/groups/create-a-group-in-your-organization).
-- For plans: membership in `local_plan_principals`.
-- For uploading the private inputs: membership in `private_input_principals`.
+- For plans and for uploading the private inputs: membership in the `iac_operators` group.
 - For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), including Billing Account Administrator (`roles/billing.admin`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects) and [Cloud Billing access control](https://docs.cloud.google.com/billing/docs/how-to/billing-access).
 
 ## Configuration
@@ -232,7 +236,7 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 | File | Committed | Contents |
 | --- | --- | --- |
 | `terraform.tfvars` | Yes | `region`, `resource_locations`, `iac_project_services`, and `audit_logs_project_services` |
-| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, `groups`, `local_plan_principals`, and `private_input_principals` |
+| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, and `groups` |
 
 Create the uncommitted file from its template and fill in the values:
 
@@ -256,7 +260,7 @@ gcloud billing accounts list
 To look up the repository and owner IDs:
 
 ```sh
-gh api repos/<owner>/<repository> --jq '.id, .owner.id'
+gh api repos/<github_repository> --jq '.id, .owner.id'
 ```
 
 ## Running

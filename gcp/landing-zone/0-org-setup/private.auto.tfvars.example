@@ -1,21 +1,13 @@
 prefix          = "<prefix>"
-org_id          = "<organization-id>"
-billing_account = "<billing-account-id>"
+org_id          = "<org_id>"
+billing_account = "<billing_account>"
 
-github_repository          = "<owner>/<repository>"
-github_repository_id       = "<repository-id>"
-github_repository_owner_id = "<owner-id>"
+github_repository          = "<github_repository>"
+github_repository_id       = "<github_repository_id>"
+github_repository_owner_id = "<github_repository_owner_id>"
 
 groups = {
-  billing_viewers     = "gcp-billing-viewers@example.com"
+  auditors            = "gcp-auditors@example.com"
+  iac_operators       = "gcp-iac-operators@example.com"
   organization_admins = "gcp-organization-admins@example.com"
-  security_reviewers  = "gcp-security-reviewers@example.com"
 }
-
-local_plan_principals = [
-  "user:<name>@example.com",
-]
-
-private_input_principals = [
-  "user:<name>@example.com",
-]

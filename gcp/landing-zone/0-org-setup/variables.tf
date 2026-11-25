@@ -55,26 +55,9 @@ variable "github_repository" {
 
 variable "groups" {
   type = object({
-    billing_viewers     = string
+    auditors            = string
+    iac_operators       = string
     organization_admins = string
-    security_reviewers  = string
   })
-  description = "Emails of the Cloud Identity groups that get organization and billing account roles: organization_admins administer both, security_reviewers read IAM policies, and billing_viewers read billing data."
-}
-
-variable "local_plan_principals" {
-  type        = set(string)
-  description = "IAM principals, such as user:name@example.com, that may impersonate the read-only stage service accounts to run terraform plan locally, and issue short-lived tokens for the agent service account."
-  default     = []
-
-  validation {
-    condition     = !anytrue([for principal in var.local_plan_principals : startswith(principal, "serviceAccount:${google_service_account.agent.account_id}@")])
-    error_message = "The agent service account already gets its plan bindings, so it can't be a local plan principal."
-  }
-}
-
-variable "private_input_principals" {
-  type        = set(string)
-  description = "IAM principals, such as user:name@example.com, that may upload the stages' private inputs to the private/ managed folder in the config bucket."
-  default     = []
+  description = "Emails of the Cloud Identity groups that get roles from this stage: organization_admins administer the organization and the billing account, iac_operators run local plans, issue agent tokens, and upload the private inputs, and auditors read IAM policies, billing data, and the audit logs."
 }
