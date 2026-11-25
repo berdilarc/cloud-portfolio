@@ -169,7 +169,25 @@ Data Access audit logs are off by default, except for BigQuery. The stage turns 
 
 A Data Access audit log turned on at the organization can't be turned off in a folder or project. See [Enable Data Access audit logs](https://docs.cloud.google.com/logging/docs/audit/configure-data-access), [Service Account Credentials audit logging](https://docs.cloud.google.com/iam/docs/audit-logging/audit-logging-iamcreds), and [Security Token Service audit logging](https://docs.cloud.google.com/iam/docs/audit-logging/audit-logging-sts).
 
-The entries go to the `_Default` log bucket of the project where the call happens. Reading them needs Private Logs Viewer (`roles/logging.privateLogViewer`) or a role that includes it, such as Security Reviewer.
+The entries go to the `_Default` log bucket of the project where the call happens, and the `iam` sink copies those of IAM, Service Account Credentials, and Security Token Service to the audit logs project (see [Log sinks](#log-sinks)). Reading them needs Private Logs Viewer (`roles/logging.privateLogViewer`) or a role that includes it, such as Security Reviewer.
+
+### Log sinks
+
+Aggregated sinks on the organization copy log entries from every folder and project to the audit logs project, as [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic) does. They don't intercept, so the entries also stay in each project's own log buckets.
+
+| Sink | Entries | Destination |
+| --- | --- | --- |
+| `audit-logs` | Admin Activity, System Event, Policy Denied, and Access Transparency audit logs | `audit-logs` log bucket |
+| `iam` | Audit logs of IAM, Service Account Credentials, and Security Token Service | `iam` log bucket |
+| `audit-logs-bigquery` | The same entries as `audit-logs` | `audit_logs` BigQuery dataset, one partitioned table per log |
+
+The log buckets are in `region`, keep entries for 30 days, and are upgraded to Log Analytics, which can't be undone. The dataset's partitions also expire after 30 days.
+
+All sinks of the organization write as one Google-managed service account, their writer identity. It gets Logs Bucket Writer on the audit logs project, conditioned on each sink's bucket, and BigQuery Data Editor on the dataset.
+
+The stage also sets the organization's default storage location for logs to `region`, so projects created from then on get their `_Default` and `_Required` buckets there instead of in `global`.
+
+See [Create an aggregated sink](https://docs.cloud.google.com/logging/docs/export/aggregated_sinks), [Route logs to supported destinations](https://docs.cloud.google.com/logging/docs/export/configure_export_v2), and [Configure default settings for organizations and folders](https://docs.cloud.google.com/logging/docs/default-settings).
 
 ### Workload Identity Federation
 
