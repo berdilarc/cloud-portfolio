@@ -15,5 +15,6 @@ iac_project_services = [
 ]
 
 audit_logs_project_services = [
+  "bigquery.googleapis.com",
   "logging.googleapis.com",
 ]
