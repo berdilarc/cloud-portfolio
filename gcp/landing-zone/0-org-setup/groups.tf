@@ -1,6 +1,7 @@
 locals {
   group_org_roles = {
     auditors = [
+      "roles/cloudasset.viewer",
       "roles/iam.securityReviewer",
     ]
     organization_admins = [
