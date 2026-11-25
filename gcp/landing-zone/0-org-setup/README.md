@@ -87,13 +87,15 @@ Each stage has a read-write service account for `terraform apply` and a read-onl
 | `2-networking` | `iac-networking-rw` | `iac-networking-ro` |
 | `2-project-factory` | `iac-pf-rw` | `iac-pf-ro` |
 
-Each stage with CI/CD enabled (only `0-org-setup` so far) has three CI/CD accounts, one per workflow trigger. Each one impersonates a stage account:
+Each stage with CI/CD enabled (`0-org-setup` and `2-networking` so far) has three CI/CD accounts, one per workflow trigger. Each one impersonates a stage account. For `0-org-setup`:
 
 | Account | Runs | As |
 | --- | --- | --- |
 | `iac-org-cicd-pr` | `terraform plan` on pull requests | `iac-org-ro` |
 | `iac-org-cicd-merge` | `terraform plan` on merges to `main` | `iac-org-ro` |
 | `iac-org-cicd-apply` | `terraform apply` after environment approval | `iac-org-rw` |
+
+The `2-networking` accounts are named the same way: `iac-networking-cicd-pr`, `iac-networking-cicd-merge`, and `iac-networking-cicd-apply`.
 
 `iac-agent` is an account for coding agents. It has no roles of its own and can only impersonate the read-only accounts, so an agent given its token can run plans but not applies.
 
@@ -108,6 +110,17 @@ The later stages' service accounts get these roles from this stage:
 | Read-write | Billing account | Billing Account User (`roles/billing.user`) |
 
 The read-only accounts can't write the state lock, so their plans run with `-lock=false`.
+
+The `2-networking` accounts also get [FAST's networking roles](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic), so the stage can create host projects in the Networking folder, share their VPCs, and manage hierarchical firewall policies:
+
+| Account | Scope | Roles |
+| --- | --- | --- |
+| `iac-networking-rw` | Organization | Compute Organization Firewall Policy Admin, Compute Organization Resource Admin, Compute Organization Security Policy Admin, and Compute Shared VPC Admin |
+| `iac-networking-rw` | Networking folder | Owner, Compute Shared VPC Admin, Folder Admin, Logging Admin, Project Creator, and Tag User |
+| `iac-networking-ro` | Organization | Compute Organization Firewall Policy User and Compute Viewer |
+| `iac-networking-ro` | Networking folder | Viewer, Folder Viewer, and Tag Viewer |
+
+The folder roles also apply to the Development and Production folders inside it.
 
 The stage 0 service accounts get the roles below. They follow the roles that [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic) grants on the organization, its projects, and the billing account, so the stage can manage a new type of resource without first granting itself a role.
 
@@ -136,12 +149,12 @@ The accounts and principals that impersonate others get Service Account Token Cr
 | --- | --- |
 | `iac_operators` group | Every read-only account and `iac-agent` |
 | `iac-agent` | Every read-only account |
-| `iac-org-cicd-pr` and `iac-org-cicd-merge` | `iac-org-ro` |
-| `iac-org-cicd-apply` | `iac-org-rw` |
+| Each stage's `-cicd-pr` and `-cicd-merge` accounts | The stage's read-only account |
+| Each stage's `-cicd-apply` account | The stage's read-write account |
 
 No person gets Token Creator on a read-write account, so only CI/CD applies the stage. See [Break-glass apply](../../../docs/runbooks/0-org-setup-break-glass-apply.md) for the exception, and [Recovery](../../../docs/runbooks/0-org-setup-recovery.md) for when a change breaks the accounts that CI/CD applies with.
 
-On the stage's managed folder in `cicd-plans`, `iac-org-cicd-merge` gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and `iac-org-cicd-apply` gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
+On each stage's managed folder in `cicd-plans`, the stage's `-cicd-merge` account gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and its `-cicd-apply` account gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
 
 On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account. On its `private/` managed folder, the `iac_operators` group gets Storage Object User (`roles/storage.objectUser`) to upload the private inputs.
 
