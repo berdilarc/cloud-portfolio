@@ -156,6 +156,21 @@ People get their roles through the Cloud Identity groups in `groups`. The stage 
 | `security_reviewers` | Organization | Security Reviewer |
 | `billing_viewers` | Billing account | Billing Account Viewer |
 
+### Data Access audit logs
+
+Data Access audit logs are off by default, except for BigQuery. The stage turns them on for these services, as [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic) does, including log types that no method of the service uses today:
+
+| Scope | Service | Log types | Records |
+| --- | --- | --- | --- |
+| Organization | Security Token Service (`sts.googleapis.com`) | Admin Read | Token exchanges, such as Workload Identity Federation sign-ins from GitHub Actions |
+| IaC core project | IAM (`iam.googleapis.com`) | Data Read and Data Write | Service account impersonation (Data Read), through the Service Account Credentials API |
+| IaC core project | Cloud Storage (`storage.googleapis.com`) | Data Read and Data Write | Reads and writes of state, plans, and configuration files |
+| IaC core project | Security Token Service (`sts.googleapis.com`) | Data Read and Data Write | Nothing today: every STS method is Admin Read |
+
+A Data Access audit log turned on at the organization can't be turned off in a folder or project. See [Enable Data Access audit logs](https://docs.cloud.google.com/logging/docs/audit/configure-data-access), [Service Account Credentials audit logging](https://docs.cloud.google.com/iam/docs/audit-logging/audit-logging-iamcreds), and [Security Token Service audit logging](https://docs.cloud.google.com/iam/docs/audit-logging/audit-logging-sts).
+
+The entries go to the `_Default` log bucket of the project where the call happens. Reading them needs Private Logs Viewer (`roles/logging.privateLogViewer`) or a role that includes it, such as Security Reviewer.
+
 ### Workload Identity Federation
 
 A workload identity pool `github` in the IaC core project, with an OIDC provider `github-actions` that trusts tokens from GitHub Actions (`https://token.actions.githubusercontent.com`). The provider:
