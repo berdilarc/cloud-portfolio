@@ -86,6 +86,16 @@ locals {
       "roles/resourcemanager.tagViewer",
       "roles/serviceusage.serviceUsageViewer",
     ]
+    "iac-networking-rw" = [
+      "roles/compute.orgFirewallPolicyAdmin",
+      "roles/compute.orgSecurityPolicyAdmin",
+      "roles/compute.orgSecurityResourceAdmin",
+      "roles/compute.xpnAdmin",
+    ]
+    "iac-networking-ro" = [
+      "roles/compute.orgFirewallPolicyUser",
+      "roles/compute.viewer",
+    ]
   }
 
   org_custom_viewer_roles = toset(["organization_admin_viewer", "tag_viewer"])

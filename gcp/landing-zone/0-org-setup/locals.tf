@@ -9,7 +9,7 @@ locals {
     }
     "2-networking" = {
       name        = "networking"
-      enable_cicd = false
+      enable_cicd = true
       sa_prefix   = "iac-networking"
     }
     "2-project-factory" = {
