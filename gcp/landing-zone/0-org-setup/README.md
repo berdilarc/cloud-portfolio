@@ -153,7 +153,7 @@ People get their roles through the Cloud Identity groups in `groups`. The stage 
 | `organization_admins` | Billing account | Billing Account Administrator |
 | `iac_operators` | Read-only stage accounts and `iac-agent` | Service Account Token Creator |
 | `iac_operators` | `private/` managed folder in `config` | Storage Object User |
-| `auditors` | Organization | Security Reviewer |
+| `auditors` | Organization | Cloud Asset Viewer and Security Reviewer |
 | `auditors` | Billing account | Billing Account Viewer |
 | `auditors` | Audit logs project | Private Logs Viewer, BigQuery Data Viewer, and BigQuery Job User |
 
