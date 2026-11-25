@@ -17,7 +17,10 @@ resource "google_project" "iac" {
   org_id          = var.org_id
   billing_account = var.billing_account
 
-  depends_on = [google_org_policy_policy.enforced]
+  depends_on = [
+    google_logging_organization_settings.default,
+    google_org_policy_policy.enforced,
+  ]
 }
 
 resource "google_project_service" "iac" {
@@ -36,7 +39,10 @@ resource "google_project" "billing_export" {
   org_id          = var.org_id
   billing_account = var.billing_account
 
-  depends_on = [google_org_policy_policy.enforced]
+  depends_on = [
+    google_logging_organization_settings.default,
+    google_org_policy_policy.enforced,
+  ]
 }
 
 resource "google_project_iam_member" "billing_export" {
@@ -55,7 +61,10 @@ resource "google_project" "audit_logs" {
   org_id          = var.org_id
   billing_account = var.billing_account
 
-  depends_on = [google_org_policy_policy.enforced]
+  depends_on = [
+    google_logging_organization_settings.default,
+    google_org_policy_policy.enforced,
+  ]
 }
 
 resource "google_project_iam_member" "audit_logs" {

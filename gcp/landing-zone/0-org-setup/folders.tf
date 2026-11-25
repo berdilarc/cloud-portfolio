@@ -8,6 +8,8 @@ locals {
 resource "google_folder" "networking" {
   display_name = "Networking"
   parent       = local.org_name
+
+  depends_on = [google_logging_organization_settings.default]
 }
 
 resource "google_folder" "networking_environment" {
@@ -20,4 +22,6 @@ resource "google_folder" "networking_environment" {
 resource "google_folder" "teams" {
   display_name = "Teams"
   parent       = local.org_name
+
+  depends_on = [google_logging_organization_settings.default]
 }
