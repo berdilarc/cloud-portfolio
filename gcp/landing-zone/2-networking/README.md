@@ -51,6 +51,19 @@ Each VPC has a Cloud Router in `region` with a [Public NAT](https://docs.cloud.g
 | `dev-0` | `dev-router` | `dev-nat` |
 | `prod-0` | `prod-router` | `prod-nat` |
 
+### DNS
+
+The hub and each spoke host project have a [private zone](https://docs.cloud.google.com/dns/docs/zones/zones-overview) under `test.`, a top-level domain reserved for testing ([RFC 6761](https://www.rfc-editor.org/rfc/rfc6761)). Each zone holds a `localhost` A record for `127.0.0.1`. A private zone answers only queries from the VPCs it's visible to, so each spoke zone is visible to its own VPC and to `hub-0`.
+
+A [peering zone](https://docs.cloud.google.com/dns/docs/zones/peering-zones) for the root domain `.` sends every query from `dev-0` and `prod-0` to `hub-0`, which resolves it in its own [name resolution order](https://docs.cloud.google.com/dns/docs/vpc-name-res-order): its private zones, then Compute Engine internal DNS, then public DNS. So the spokes resolve all three zones through the hub. DNS peering doesn't depend on VPC Network Peering.
+
+| Zone | Project | DNS name | Kind | Visible to |
+| --- | --- | --- | --- | --- |
+| `pvt-test` | `<prefix>-prod-net-core-0` | `test.` | Private | `hub-0` |
+| `pvt-dev-test` | `<prefix>-dev-net-spoke-0` | `dev.test.` | Private | `dev-0`, `hub-0` |
+| `pvt-prod-test` | `<prefix>-prod-net-spoke-0` | `prod.test.` | Private | `prod-0`, `hub-0` |
+| `peer-root` | `<prefix>-prod-net-core-0` | `.` | Peering with `hub-0` | `dev-0`, `prod-0` |
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
