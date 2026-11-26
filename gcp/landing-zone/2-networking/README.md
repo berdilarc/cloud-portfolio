@@ -28,6 +28,19 @@ Each host project has one custom-mode VPC with global dynamic routing and one su
 | `dev-0` | `<prefix>-dev-net-spoke-0` | `dev-default` | `10.73.0.0/24` | `pods` `10.73.64.0/18`, `services` `10.73.16.0/20` |
 | `prod-0` | `<prefix>-prod-net-spoke-0` | `prod-default` | `10.72.0.0/24` | `pods` `10.72.64.0/18`, `services` `10.72.16.0/20` |
 
+### Peering
+
+`hub-0` is peered with `dev-0` and `prod-0` through [VPC Network Peering](https://docs.cloud.google.com/vpc/docs/vpc-peering). A peering is a pair of connections, one created in each network, and becomes active once both exist:
+
+| Connection | Network | Peer network |
+| --- | --- | --- |
+| `hub-to-dev` | `hub-0` | `dev-0` |
+| `dev-to-hub` | `dev-0` | `hub-0` |
+| `hub-to-prod` | `hub-0` | `prod-0` |
+| `prod-to-hub` | `prod-0` | `hub-0` |
+
+Peered networks always exchange their subnet routes. Every connection also exports and imports custom routes, so static and dynamic routes added to one network later reach its peers, except those with network tags or the default internet gateway as next hop. Peering isn't transitive, so `dev-0` and `prod-0` can't reach each other through `hub-0`.
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
