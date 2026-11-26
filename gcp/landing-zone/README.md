@@ -48,8 +48,6 @@ Each stage with CI/CD has a caller workflow that runs the reusable workflow [`te
 
 The `apply` job runs only when the merge plan has changes. The saved plan is only compared, never applied: the job applies the plan it made itself. The comparison covers every resource and output change that isn't a no-op, values before the change included, so it also fails if a resource in the plan changed outside Terraform after the merge plan.
 
-Workflow logs and pull request comments are public, so the summary lists only resource addresses and actions. The domain is a secret: GitHub [masks it in logs](https://docs.github.com/en/actions/concepts/security/secrets), and the summary redacts it. Other identifiers, such as the prefix and the organization and billing account IDs, can appear in logs.
-
 ### Setup
 
 Repository variables and a secret:
