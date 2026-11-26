@@ -1,0 +1,37 @@
+name: stage-2-networking
+
+on:
+  pull_request:
+    paths:
+      - gcp/landing-zone/2-networking/**
+      - .github/workflows/terraform.yml
+      - .github/workflows/stage-2-networking.yml
+      - mise.toml
+      - mise.lock
+  push:
+    branches:
+      - main
+    paths:
+      - gcp/landing-zone/2-networking/**
+      - .github/workflows/terraform.yml
+      - .github/workflows/stage-2-networking.yml
+      - mise.toml
+      - mise.lock
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation login to Google Cloud
+      pull-requests: write # plan summary comment
+    uses: ./.github/workflows/terraform.yml
+    with:
+      stage: 2-networking
+      working_directory: gcp/landing-zone/2-networking
+      service_account_prefix: iac-networking
+      tfvars_files: 0-org-setup
+    secrets:
+      domain: ${{ secrets.GCP_DOMAIN }}

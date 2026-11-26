@@ -7,6 +7,7 @@ The layout follows the stage names of [Cloud Foundation Fabric FAST](https://git
 | Stage | Contents |
 | --- | --- |
 | [`0-org-setup`](0-org-setup/) | Folders; IaC core, billing export, and audit logs projects; state buckets and service accounts for every stage; and Workload Identity Federation for GitHub Actions |
+| [`2-networking`](2-networking/) | Hub and spoke host projects |
 
 ## Hand-off between stages
 
@@ -38,13 +39,13 @@ In CI/CD, they come from repository variables, a secret, and the workflow contex
 
 ## CI/CD
 
-Each stage with CI/CD has a caller workflow that runs the reusable workflow [`terraform.yml`](../../.github/workflows/terraform.yml), with an environment named after the stage and the stage's three CI/CD accounts (see [Service accounts](0-org-setup/README.md#service-accounts)). So far only `0-org-setup` has one: [`stage-0-org-setup.yml`](../../.github/workflows/stage-0-org-setup.yml) runs when a change touches the stage directory, either workflow file, or `mise.toml` and `mise.lock`, which pin Terraform.
+Each stage with CI/CD has a caller workflow that runs the reusable workflow [`terraform.yml`](../../.github/workflows/terraform.yml), with an environment named after the stage and the stage's three CI/CD accounts (see [Service accounts](0-org-setup/README.md#service-accounts)). [`stage-0-org-setup.yml`](../../.github/workflows/stage-0-org-setup.yml) and [`stage-2-networking.yml`](../../.github/workflows/stage-2-networking.yml) each run when a change touches their stage directory, either workflow file, or `mise.toml` and `mise.lock`, which pin Terraform. A caller also lists the earlier stages' tfvars files that its stage needs, in `tfvars_files`. In the table, `<stage>` and `<service_account_prefix>` are the caller's inputs, such as `2-networking` and `iac-networking`.
 
 | Trigger | Job | Account | What it does |
 | --- | --- | --- | --- |
-| Pull request | `plan` | `iac-org-cicd-pr`, as `iac-org-ro` | Plans with `-lock=false` and comments a summary on the pull request |
-| Push to `main` | `plan` | `iac-org-cicd-merge`, as `iac-org-ro` | Plans and, if there are changes, saves the plan in `cicd-plans` as `0-org-setup/<commit>-<run-attempt>.tfplan` |
-| Push to `main` | `apply` | `iac-org-cicd-apply`, as `iac-org-rw` | Waits for approval in the `0-org-setup` environment, plans again with the state lock, compares the new plan with the saved one, and applies the new plan only if their changes match |
+| Pull request | `plan` | `<service_account_prefix>-cicd-pr`, as `<service_account_prefix>-ro` | Plans with `-lock=false` and comments a summary on the pull request |
+| Push to `main` | `plan` | `<service_account_prefix>-cicd-merge`, as `<service_account_prefix>-ro` | Plans and, if there are changes, saves the plan in `cicd-plans` as `<stage>/<commit>-<run-attempt>.tfplan` |
+| Push to `main` | `apply` | `<service_account_prefix>-cicd-apply`, as `<service_account_prefix>-rw` | Waits for approval in the `<stage>` environment, plans again with the state lock, compares the new plan with the saved one, and applies the new plan only if their changes match |
 
 The `apply` job runs only when the merge plan has changes. The saved plan is only compared, never applied: the job applies the plan it made itself. The comparison covers every resource and output change that isn't a no-op, values before the change included, so it also fails if a resource in the plan changed outside Terraform after the merge plan.
 
