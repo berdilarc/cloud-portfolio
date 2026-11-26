@@ -16,6 +16,18 @@ Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/dec
 
 The projects are linked to `billing_account`. The organization's org policies stop the default network.
 
+Every host project has the APIs listed in `host_project_services` enabled and is a [Shared VPC host project](https://docs.cloud.google.com/vpc/docs/shared-vpc): projects attached to it as service projects can use its subnets. Removing an API from the list stops Terraform from managing it but leaves it enabled.
+
+### Networks
+
+Each host project has one custom-mode VPC with global dynamic routing and one subnet in `region`, with Private Google Access on. The spoke subnets have secondary ranges reserved for GKE Pods and Services. The ranges of the networks don't overlap, so they can be peered.
+
+| VPC | Project | Subnet | Primary range | Secondary ranges |
+| --- | --- | --- | --- | --- |
+| `hub-0` | `<prefix>-prod-net-core-0` | `hub-default` | `10.71.0.0/24` | |
+| `dev-0` | `<prefix>-dev-net-spoke-0` | `dev-default` | `10.73.0.0/24` | `pods` `10.73.64.0/18`, `services` `10.73.16.0/20` |
+| `prod-0` | `<prefix>-prod-net-spoke-0` | `prod-default` | `10.72.0.0/24` | `pods` `10.72.64.0/18`, `services` `10.72.16.0/20` |
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
@@ -23,6 +35,8 @@ The projects are linked to `billing_account`. The organization's org policies st
 - For plans: membership in the `iac_operators` group of `0-org-setup`.
 
 ## Configuration
+
+`terraform.tfvars` holds the choices that any deployment can keep: `region` and `host_project_services`.
 
 `prefix` and `billing_account` come from `TF_VAR_*` environment variables. See [Configuration](../README.md#configuration).
 
