@@ -66,16 +66,16 @@ A [peering zone](https://docs.cloud.google.com/dns/docs/zones/peering-zones) for
 
 ### Firewall
 
-Each VPC has the same ingress rules, all with no targets, so they apply to every VM in the network. Firewall rules aren't shared through peering, so each VPC needs its own. The allow rules live in a [global network firewall policy](https://docs.cloud.google.com/firewall/docs/network-firewall-policies) per VPC, named after the VPC and associated with it. The deny rule is a [VPC firewall rule](https://docs.cloud.google.com/firewall/docs/firewalls).
+Each VPC has the same ingress rules, all with no targets, so they apply to every VM in the network. The allow rules live in one [hierarchical firewall policy](https://docs.cloud.google.com/firewall/docs/firewall-policies), `network-policy`, which is created in the Networking folder and associated with it, so it applies to the VPCs of all three host projects. VMs in Shared VPC service projects get the same rules, because the host project's folder decides which hierarchical policies apply. The deny rule is a [VPC firewall rule](https://docs.cloud.google.com/firewall/docs/firewalls) in each VPC.
 
 | Rule | Kind | Priority | Action | Sources | Protocols and ports | Logging |
 | --- | --- | --- | --- | --- | --- | --- |
-| `allow-healthchecks` | Policy | 1001 | Allow | [Health check probe ranges](https://docs.cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges) | TCP 22, 80, and 443 | Off |
-| `allow-ssh-from-iap` | Policy | 1002 | Allow | `35.235.240.0/20`, the [IAP TCP forwarding](https://docs.cloud.google.com/iap/docs/using-tcp-forwarding) range | TCP 22 | On |
-| `allow-icmp` | Policy | 1003 | Allow | `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` | ICMP | Off |
+| `allow-healthchecks` | Hierarchical | 1001 | Allow | [Health check probe ranges](https://docs.cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges) | TCP 22, 80, and 443 | Off |
+| `allow-ssh-from-iap` | Hierarchical | 1002 | Allow | `35.235.240.0/20`, the [IAP TCP forwarding](https://docs.cloud.google.com/iap/docs/using-tcp-forwarding) range | TCP 22 | On |
+| `allow-icmp` | Hierarchical | 1003 | Allow | `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` | ICMP | Off |
 | `ingress-default-deny` | VPC | 65535 | Deny | `0.0.0.0/0` | All | On |
 
-Each VPC sets its [enforcement order](https://docs.cloud.google.com/firewall/docs/firewall-policies-rule-eval-order) to `BEFORE_CLASSIC_FIREWALL`, so the policy is evaluated before the VPC firewall rules. Traffic that no policy rule matches goes on to the VPC rules, where `ingress-default-deny` blocks it. With the default order, the deny rule would block the traffic before the policy is evaluated.
+Hierarchical policies are [evaluated](https://docs.cloud.google.com/firewall/docs/firewall-policies-rule-eval-order) before any VPC firewall rule, and a matching allow rule ends the evaluation. Traffic that no policy rule matches goes on to the VPC rules, where `ingress-default-deny` blocks it.
 
 `ingress-default-deny` blocks what the [implied deny ingress rule](https://docs.cloud.google.com/firewall/docs/firewalls#default_firewall_rules) already blocks, but it can be logged and the implied rule can't. [Firewall Rules Logging](https://docs.cloud.google.com/firewall/docs/firewall-policy-rules-logging-overview) writes to the host project's logs; the deny rule logs without metadata fields. Egress is open through the implied allow egress rule.
 
