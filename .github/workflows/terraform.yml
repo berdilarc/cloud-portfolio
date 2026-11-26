@@ -94,7 +94,7 @@ jobs:
         run: terraform init -input=false -lockfile=readonly -no-color
 
       - name: Terraform plan
-        run: terraform plan -input=false -lock=false -no-color -out tfplan
+        run: terraform plan -input=false -lock=false -compact-warnings -no-color -out tfplan
 
       - name: Summarize plan
         id: summary
@@ -206,7 +206,7 @@ jobs:
         run: terraform init -input=false -lockfile=readonly -no-color
 
       - name: Terraform plan
-        run: terraform plan -input=false -no-color -out tfplan
+        run: terraform plan -input=false -compact-warnings -no-color -out tfplan
 
       - name: Compare with merge plan
         run: |
@@ -222,4 +222,4 @@ jobs:
           fi
 
       - name: Terraform apply
-        run: terraform apply -input=false -no-color tfplan
+        run: terraform apply -input=false -compact-warnings -no-color tfplan
