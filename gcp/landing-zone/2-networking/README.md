@@ -64,6 +64,19 @@ A [peering zone](https://docs.cloud.google.com/dns/docs/zones/peering-zones) for
 | `pvt-prod-test` | `<prefix>-prod-net-spoke-0` | `prod.test.` | Private | `prod-0`, `hub-0` |
 | `peer-root` | `<prefix>-prod-net-core-0` | `.` | Peering with `hub-0` | `dev-0`, `prod-0` |
 
+### Firewall
+
+Each VPC has the same [VPC firewall rules](https://docs.cloud.google.com/firewall/docs/firewalls), all for ingress and with no targets, so they apply to every VM in the network. Firewall rules aren't shared through peering, so each VPC needs its own.
+
+| Rule | Priority | Action | Sources | Protocols and ports | Logging |
+| --- | --- | --- | --- | --- | --- |
+| `allow-healthchecks` | 1001 | Allow | [Health check probe ranges](https://docs.cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges) | TCP 22, 80, and 443 | Off |
+| `allow-ssh-from-iap` | 1002 | Allow | `35.235.240.0/20`, the [IAP TCP forwarding](https://docs.cloud.google.com/iap/docs/using-tcp-forwarding) range | TCP 22 | On |
+| `allow-icmp` | 1003 | Allow | `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` | ICMP | Off |
+| `ingress-default-deny` | 65535 | Deny | `0.0.0.0/0` | All | On |
+
+`ingress-default-deny` blocks what the [implied deny ingress rule](https://docs.cloud.google.com/firewall/docs/firewalls#default_firewall_rules) already blocks, but it can be logged and the implied rule can't. [Firewall Rules Logging](https://docs.cloud.google.com/firewall/docs/firewall-policy-rules-logging-overview) writes to the host project's logs without metadata fields. Egress is open through the implied allow egress rule.
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
