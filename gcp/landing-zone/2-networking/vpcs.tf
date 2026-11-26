@@ -24,11 +24,10 @@ locals {
 resource "google_compute_network" "vpc" {
   for_each = google_project.host
 
-  name                                      = "${each.key}-0"
-  project                                   = each.value.project_id
-  auto_create_subnetworks                   = false
-  routing_mode                              = "GLOBAL"
-  network_firewall_policy_enforcement_order = "BEFORE_CLASSIC_FIREWALL"
+  name                    = "${each.key}-0"
+  project                 = each.value.project_id
+  auto_create_subnetworks = false
+  routing_mode            = "GLOBAL"
 
   depends_on = [google_project_service.host]
 }
