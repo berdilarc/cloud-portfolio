@@ -13,6 +13,7 @@ resource_locations = [
 iac_project_services = [
   "cloudbilling.googleapis.com",
   "cloudresourcemanager.googleapis.com",
+  "compute.googleapis.com",
   "iam.googleapis.com",
   "iamcredentials.googleapis.com",
   "orgpolicy.googleapis.com",
