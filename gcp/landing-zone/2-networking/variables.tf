@@ -12,3 +12,13 @@ variable "billing_account" {
   type        = string
   description = "ID of the billing account linked to every project, as XXXXXX-XXXXXX-XXXXXX."
 }
+
+variable "region" {
+  type        = string
+  description = "Region for regional resources, such as the subnets."
+}
+
+variable "host_project_services" {
+  type        = set(string)
+  description = "APIs to enable in every host project. Removing an entry stops Terraform from managing the API but leaves it enabled."
+}
