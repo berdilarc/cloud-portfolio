@@ -35,27 +35,17 @@ locals {
   }
 }
 
-resource "google_compute_network_firewall_policy" "vpc" {
-  for_each = google_compute_network.vpc
-
-  name        = each.value.name
-  description = "Allow rules for the ${each.value.name} VPC."
-  project     = each.value.project
+resource "google_compute_firewall_policy" "networking" {
+  short_name  = "network-policy"
+  description = "Allow rules for every VPC in the Networking folder."
+  parent      = var.folder_ids["networking"]
 }
 
-resource "google_compute_network_firewall_policy_rule" "ingress_allow" {
-  for_each = {
-    for pair in setproduct(keys(google_compute_network_firewall_policy.vpc), keys(local.ingress_allow_rules)) :
-    "${pair[0]} ${pair[1]}" => merge(local.ingress_allow_rules[pair[1]], {
-      name   = pair[1]
-      policy = pair[0]
-    })
-  }
+resource "google_compute_firewall_policy_rule" "ingress_allow" {
+  for_each = local.ingress_allow_rules
 
-  rule_name       = each.value.name
   description     = each.value.description
-  project         = google_compute_network_firewall_policy.vpc[each.value.policy].project
-  firewall_policy = google_compute_network_firewall_policy.vpc[each.value.policy].name
+  firewall_policy = google_compute_firewall_policy.networking.name
   direction       = "INGRESS"
   priority        = each.value.priority
   action          = "allow"
@@ -71,13 +61,10 @@ resource "google_compute_network_firewall_policy_rule" "ingress_allow" {
   }
 }
 
-resource "google_compute_network_firewall_policy_association" "vpc" {
-  for_each = google_compute_network_firewall_policy.vpc
-
-  name              = each.value.name
-  project           = each.value.project
-  firewall_policy   = each.value.name
-  attachment_target = google_compute_network.vpc[each.key].id
+resource "google_compute_firewall_policy_association" "networking" {
+  name              = "networking"
+  firewall_policy   = google_compute_firewall_policy.networking.id
+  attachment_target = var.folder_ids["networking"]
 }
 
 resource "google_compute_firewall" "ingress_deny" {
