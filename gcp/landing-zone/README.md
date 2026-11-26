@@ -10,9 +10,31 @@ The layout follows the stage names of [Cloud Foundation Fabric FAST](https://git
 
 ## Hand-off between stages
 
-Stage 0 creates a read-write and a read-only service account for each stage, and keeps the later stages' state in managed folders of one bucket. It also writes the files that a later stage needs to the `config` bucket: a providers file with the gcs backend and impersonation for each account, and tfvars files with the identifiers created so far. A stage copies them into its directory before `terraform init`. See [Output files](0-org-setup/README.md#output-files).
+Stage 0 creates a read-write and a read-only service account for each stage, and keeps the later stages' state in managed folders of one bucket. It also writes the files that a later stage needs to the `outputs` bucket: a providers file with the gcs backend and impersonation for each account, and tfvars files with the identifiers created so far. A stage copies them into its directory before `terraform init`. See [Output files](0-org-setup/README.md#output-files).
 
 Names follow [ADR 0001](../../docs/decisions/0001-name-resources-with-prefix-environment-purpose-counter.md).
+
+## Configuration
+
+The values unique to a deployment aren't committed, so that a clone or fork can deploy its own copy without changing tracked files. Every stage reads them from `TF_VAR_*` environment variables. Terraform [ignores environment variables](https://developer.hashicorp.com/terraform/language/values/variables) for variables that a stage doesn't declare.
+
+| Variable | Value | Look it up with |
+| --- | --- | --- |
+| `TF_VAR_prefix` | Short string that starts every globally unique name | |
+| `TF_VAR_org_id` | Numeric ID of the organization | `gcloud organizations list` |
+| `TF_VAR_billing_account` | ID of the billing account | `gcloud billing accounts list` |
+| `TF_VAR_domain` | Domain of the organization and its groups | `gcloud organizations list` |
+| `TF_VAR_github_repository` | Repository, as owner/name | |
+| `TF_VAR_github_repository_id` | Numeric ID of the repository | `gh api repos/<github_repository> --jq .id` |
+| `TF_VAR_github_repository_owner_id` | Numeric ID of the repository owner | `gh api repos/<github_repository> --jq .owner.id` |
+
+Locally, they come from `mise.local.toml` at the repository root, which `.gitignore` keeps out of the repository. mise loads its `[env]` section in every directory below the root. See [mise configuration](https://mise.jdx.dev/configuration.html). Create it from its template and fill in the values:
+
+```sh
+cp mise.local.toml.example mise.local.toml
+```
+
+In CI/CD, they come from repository variables, a secret, and the workflow context (see [Setup](#setup)).
 
 ## CI/CD
 
@@ -26,32 +48,34 @@ Each stage with CI/CD has a caller workflow that runs the reusable workflow [`te
 
 The `apply` job runs only when the merge plan has changes. The saved plan is only compared, never applied: the job applies the plan it made itself. The comparison covers every resource and output change that isn't a no-op, values before the change included, so it also fails if a resource in the plan changed outside Terraform after the merge plan.
 
-Workflow logs and pull request comments are public, so the summary lists only resource addresses and actions, and each job [masks](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#masking-a-value-in-a-log) the project ID, the project number, and the values of the private inputs before running Terraform.
-
 ### Setup
 
-Repository secrets, from the outputs of `0-org-setup`:
+Repository variables and a secret:
 
-| Secret | Value |
-| --- | --- |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `workload_identity_provider` |
-| `GCP_CONFIG_BUCKET` | `storage_buckets["config"]` |
-| `GCP_CICD_PLANS_BUCKET` | `storage_buckets["cicd-plans"]` |
-| `ORG_SETUP_CICD_PR_SA` | `service_accounts["iac-org-cicd-pr"]` |
-| `ORG_SETUP_CICD_MERGE_SA` | `service_accounts["iac-org-cicd-merge"]` |
+| Name | Kind | Value |
+| --- | --- | --- |
+| `GCP_PREFIX` | Variable | `prefix` |
+| `GCP_ORG_ID` | Variable | `org_id` |
+| `GCP_BILLING_ACCOUNT` | Variable | `billing_account` |
+| `GCP_IAC_PROJECT_NUMBER` | Variable | Number of the IaC core project, for the workload identity provider's name |
+| `GCP_DOMAIN` | Secret | `domain` |
 
 For example:
 
 ```sh
-gh secret set GCP_CICD_PLANS_BUCKET --body <prefix>-prod-iac-core-0-cicd-plans
+gh variable set GCP_PREFIX --body <prefix>
+gh secret set GCP_DOMAIN --body <domain>
+gh secret set GCP_DOMAIN --app dependabot --body <domain>
 ```
 
-`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_CONFIG_BUCKET`, and `ORG_SETUP_CICD_PR_SA` are also Dependabot secrets, so that Dependabot pull requests get a plan.
-
-An environment `0-org-setup` with a required reviewer and the environment secret `CICD_APPLY_SA`, set to `service_accounts["iac-org-cicd-apply"]`:
+To look up the project number:
 
 ```sh
-gh secret set CICD_APPLY_SA --env 0-org-setup --body iac-org-cicd-apply@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
+gcloud projects describe <prefix>-prod-iac-core-0 --format "value(projectNumber)"
 ```
 
-Only a job in the environment can impersonate `iac-org-cicd-apply`, because its Workload Identity User binding is on the `environment:0-org-setup` subject, and such a job [gets environment secrets only after approval](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+`GCP_DOMAIN` is also a Dependabot secret, because Dependabot pull requests get only Dependabot secrets. They can read repository variables. A job fails if any of these values is empty.
+
+The workflow builds the names of the CI/CD accounts, the buckets, and the workload identity provider from the prefix and the project number, and takes the repository and owner IDs from the `github` [context](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context).
+
+Each stage with CI/CD also needs an environment named after the stage, with a required reviewer. Only a job in the environment can impersonate the stage's `-cicd-apply` account, because its Workload Identity User binding is on the `environment:<stage>` subject.

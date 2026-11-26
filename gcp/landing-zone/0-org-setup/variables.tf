@@ -18,6 +18,11 @@ variable "billing_account" {
   description = "ID of the billing account linked to every project, as XXXXXX-XXXXXX-XXXXXX."
 }
 
+variable "domain" {
+  type        = string
+  description = "Domain of the organization and its Cloud Identity groups."
+}
+
 variable "region" {
   type        = string
   description = "Region for regional resources, such as the IaC buckets."
@@ -59,5 +64,5 @@ variable "groups" {
     iac_operators       = string
     organization_admins = string
   })
-  description = "Emails of the Cloud Identity groups that get roles from this stage: organization_admins administer the organization and the billing account, iac_operators run local plans, issue agent tokens, and upload the private inputs, and auditors read IAM policies, billing data, and the audit logs."
+  description = "Names of the Cloud Identity groups that get roles from this stage, without the domain: organization_admins administer the organization and the billing account, iac_operators run local plans and issue agent tokens, and auditors read IAM policies, billing data, and the audit logs."
 }

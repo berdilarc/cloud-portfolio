@@ -66,7 +66,7 @@ resource "google_organization_iam_member" "group" {
 
   org_id = var.org_id
   role   = each.value.role
-  member = "group:${var.groups[each.value.group]}"
+  member = local.group_members[each.value.group]
 }
 
 resource "google_billing_account_iam_member" "group" {
@@ -74,7 +74,7 @@ resource "google_billing_account_iam_member" "group" {
 
   billing_account_id = var.billing_account
   role               = each.value.role
-  member             = "group:${var.groups[each.value.group]}"
+  member             = local.group_members[each.value.group]
 }
 
 resource "google_project_iam_member" "group_audit_logs" {
@@ -82,5 +82,5 @@ resource "google_project_iam_member" "group_audit_logs" {
 
   project = google_project.audit_logs.project_id
   role    = each.value.role
-  member  = "group:${var.groups[each.value.group]}"
+  member  = local.group_members[each.value.group]
 }
