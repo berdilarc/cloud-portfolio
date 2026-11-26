@@ -57,7 +57,7 @@ The stage manages only the billing export project itself. Its dataset, the expor
 
 The APIs listed in `terraform.tfvars` are enabled in the IaC core project (`iac_project_services`) and the audit logs project (`audit_logs_project_services`). Removing an API from a list stops Terraform from managing it but leaves it enabled.
 
-The stage service accounts live in the IaC core project, so it is the quota project for their API calls: an API that Terraform calls, such as the Cloud Billing API for project billing links, must be enabled there. See [How the quota project is determined](https://docs.cloud.google.com/docs/quotas/quota-project).
+The stage service accounts live in the IaC core project, so it is the quota project for their API calls: an API that Terraform calls, such as the Cloud Billing API for project billing links, must be enabled there. The Compute Engine API is needed there for resources that belong to no project, such as hierarchical firewall policies. See [How the quota project is determined](https://docs.cloud.google.com/docs/quotas/quota-project).
 
 ### Buckets
 
