@@ -41,6 +41,16 @@ Each host project has one custom-mode VPC with global dynamic routing and one su
 
 Peered networks always exchange their subnet routes. Every connection also exports and imports custom routes, so static and dynamic routes added to one network later reach its peers, except those with network tags or the default internet gateway as next hop. Peering isn't transitive, so `dev-0` and `prod-0` can't reach each other through `hub-0`.
 
+### NAT
+
+Each VPC has a Cloud Router in `region` with a [Public NAT](https://docs.cloud.google.com/nat/docs/public-nat) gateway, so VMs without external IP addresses can reach the internet. The gateway serves every range of every subnet in the region and allocates its external IP addresses automatically. A gateway can't serve VMs in peered networks ([Cloud NAT product interactions](https://docs.cloud.google.com/nat/docs/nat-product-interactions)), so every VPC has its own.
+
+| VPC | Cloud Router | NAT gateway |
+| --- | --- | --- |
+| `hub-0` | `hub-router` | `hub-nat` |
+| `dev-0` | `dev-router` | `dev-nat` |
+| `prod-0` | `prod-router` | `prod-nat` |
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
