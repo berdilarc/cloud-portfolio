@@ -22,11 +22,11 @@ The grants [typically take 2 minutes to take effect, potentially 7 minutes or lo
 
 ## Apply
 
-In the stage directory, replace the read-only providers file with the read-write one, since only one of them can be in the directory at a time. Download it as `iac-org-rw`, which can read the `config` bucket:
+In the stage directory, replace the read-only providers file with the read-write one, since only one of them can be in the directory at a time. Download it as `iac-org-rw`, which can read the `outputs` bucket:
 
 ```sh
 rm 0-org-setup-ro-providers.tf
-gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-providers.tf . --impersonate-service-account iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
+gcloud storage cp gs://<prefix>-prod-iac-core-0-outputs/providers/0-org-setup-providers.tf . --impersonate-service-account iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
 terraform init -reconfigure
 terraform plan -out tfplan
 terraform apply tfplan
@@ -36,7 +36,7 @@ Then switch back:
 
 ```sh
 rm tfplan 0-org-setup-providers.tf
-gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf . --impersonate-service-account iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
+gcloud storage cp gs://<prefix>-prod-iac-core-0-outputs/providers/0-org-setup-ro-providers.tf . --impersonate-service-account iac-org-rw@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
 terraform init -reconfigure
 ```
 

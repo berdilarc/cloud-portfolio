@@ -67,15 +67,13 @@ Three buckets in the IaC core project, named `<project-id>-<purpose>`, in `regio
 | --- | --- |
 | `org-state` | State of this stage |
 | `stage-state` | State of the later stages, one managed folder per stage |
-| `config` | Files that a stage copies into its directory before `terraform init`: generated providers and tfvars files (see [Output files](#output-files)), and private inputs (see [Configuration](#configuration)) |
+| `outputs` | Generated providers and tfvars files that a stage copies into its directory before `terraform init` (see [Output files](#output-files)) |
 
 All three have uniform bucket-level access, enforced public access prevention, and object versioning. A lifecycle rule deletes a noncurrent version once it has 5 newer versions and has been noncurrent for 30 days; an object [has to match all conditions](https://docs.cloud.google.com/storage/docs/lifecycle) of a rule. Terraform refuses to destroy the buckets (`prevent_destroy`).
 
 A fourth bucket, `cicd-plans`, holds the plan files that CI/CD saves between the merge plan and the apply. It has uniform bucket-level access and enforced public access prevention, but no object versioning and no soft delete, and a lifecycle rule deletes objects after 7 days. It has a managed folder for each stage with CI/CD enabled.
 
 `stage-state` has a [managed folder](https://docs.cloud.google.com/storage/docs/managed-folders) for each later stage (`2-networking/`, `2-project-factory/`). Each stage's service accounts get access to their own folder only.
-
-`config` has a managed folder `private/` for the private inputs, so that uploading them doesn't need write access to the whole bucket.
 
 ### Service accounts
 
@@ -156,7 +154,7 @@ No person gets Token Creator on a read-write account, so only CI/CD applies the 
 
 On each stage's managed folder in `cicd-plans`, the stage's `-cicd-merge` account gets Storage Object Creator (`roles/storage.objectCreator`) to save the plan, and its `-cicd-apply` account gets Storage Object Viewer (`roles/storage.objectViewer`) to read it.
 
-On the `config` bucket, the CI/CD accounts get Storage Object Viewer to download the providers file and the private inputs before they impersonate a stage account. On its `private/` managed folder, the `iac_operators` group gets Storage Object User (`roles/storage.objectUser`) to upload the private inputs.
+On the `outputs` bucket, the CI/CD accounts get Storage Object Viewer to download the providers and tfvars files before they impersonate a stage account.
 
 People get their roles through the Cloud Identity groups in `groups`. The stage binds the groups but doesn't create them:
 
@@ -165,12 +163,11 @@ People get their roles through the Cloud Identity groups in `groups`. The stage 
 | `organization_admins` | Organization | Advisory Notifications Viewer and Organization Administrator |
 | `organization_admins` | Billing account | Billing Account Administrator |
 | `iac_operators` | Read-only stage accounts and `iac-agent` | Service Account Token Creator |
-| `iac_operators` | `private/` managed folder in `config` | Storage Object User |
 | `auditors` | Organization | Cloud Asset Viewer and Security Reviewer |
 | `auditors` | Billing account | Billing Account Viewer |
 | `auditors` | Audit logs project | Private Logs Viewer, BigQuery Data Viewer, and BigQuery Job User |
 
-The groups split people by what they can affect: organization admins change the organization and billing, which CI/CD normally does for them; IaC operators influence what Terraform does, through plans and private inputs, but can't apply; auditors only read.
+The groups split people by what they can affect: organization admins change the organization and billing, which CI/CD normally does for them; IaC operators see what Terraform would do, through plans, but can't apply; auditors only read.
 
 ### Data Access audit logs
 
@@ -226,13 +223,12 @@ The stage accounts have no Workload Identity User bindings. A workflow reaches t
 
 ### Output files
 
-The stage writes these files to the `config` bucket:
+The stage writes these files to the `outputs` bucket:
 
 | Object | Contents |
 | --- | --- |
 | `providers/<stage>-providers.tf` | gcs backend and `google` provider, both impersonating the stage's read-write account |
 | `providers/<stage>-ro-providers.tf` | The same for the read-only account |
-| `tfvars/0-globals.auto.tfvars.json` | Billing account, organization, prefix, and region |
 | `tfvars/0-org-setup.auto.tfvars.json` | Custom roles, folder IDs, project IDs, service accounts, buckets, and the workload identity provider |
 
 A stage copies the files it needs into its directory. They hold identifiers, so `.gitignore` keeps them out of the repository.
@@ -241,47 +237,21 @@ A stage copies the files it needs into its directory. They hold identifiers, so 
 
 - Terraform 1.17.0 or later.
 - The groups in `groups`, created by a super admin or a Groups Admin in the Admin console or with `gcloud identity groups create`. See [Create a group in your organization](https://knowledge.workspace.google.com/admin/groups/create-a-group-in-your-organization).
-- For plans and for uploading the private inputs: membership in the `iac_operators` group.
+- For plans: membership in the `iac_operators` group.
 - For the first apply, with your own credentials: the roles of `iac-org-rw` listed in [IAM](#iam), including Billing Account Administrator (`roles/billing.admin`) on the billing account. See [Creating and managing projects](https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects) and [Cloud Billing access control](https://docs.cloud.google.com/billing/docs/how-to/billing-access).
 
 ## Configuration
 
-| File | Committed | Contents |
-| --- | --- | --- |
-| `terraform.tfvars` | Yes | `region`, `resource_locations`, `iac_project_services`, and `audit_logs_project_services` |
-| `private.auto.tfvars` | No | `prefix`, `org_id`, `billing_account`, `github_repository_id`, `github_repository_owner_id`, `github_repository`, and `groups` |
+`terraform.tfvars` holds the choices that any deployment can keep: `region`, `resource_locations`, `groups`, `iac_project_services`, and `audit_logs_project_services`. `groups` holds the group names without the domain; the stage adds `@<domain>`.
 
-Create the uncommitted file from its template and fill in the values:
-
-```sh
-cp private.auto.tfvars.example private.auto.tfvars
-```
-
-CI/CD has no copy of the file, so upload it to the `config` bucket after each change:
-
-```sh
-gcloud storage cp private.auto.tfvars gs://<prefix>-prod-iac-core-0-config/private/0-org-setup.auto.tfvars
-```
-
-To look up the organization and billing account IDs:
-
-```sh
-gcloud organizations list
-gcloud billing accounts list
-```
-
-To look up the repository and owner IDs:
-
-```sh
-gh api repos/<github_repository> --jq '.id, .owner.id'
-```
+The values unique to a deployment, `prefix`, `org_id`, `billing_account`, `domain`, `github_repository`, `github_repository_id`, and `github_repository_owner_id`, come from `TF_VAR_*` environment variables. See [Configuration](../README.md#configuration).
 
 ## Running
 
 The state is in the `org-state` bucket. To plan as `iac-org-ro`, download its providers file as `iac-org-ro` too:
 
 ```sh
-gcloud storage cp gs://<prefix>-prod-iac-core-0-config/providers/0-org-setup-ro-providers.tf . --impersonate-service-account iac-org-ro@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
+gcloud storage cp gs://<prefix>-prod-iac-core-0-outputs/providers/0-org-setup-ro-providers.tf . --impersonate-service-account iac-org-ro@<prefix>-prod-iac-core-0.iam.gserviceaccount.com
 terraform init
 terraform plan -lock=false
 ```
