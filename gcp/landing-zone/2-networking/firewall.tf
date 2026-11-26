@@ -35,35 +35,49 @@ locals {
   }
 }
 
-resource "google_compute_firewall" "ingress_allow" {
+resource "google_compute_network_firewall_policy" "vpc" {
+  for_each = google_compute_network.vpc
+
+  name        = each.value.name
+  description = "Allow rules for the ${each.value.name} VPC."
+  project     = each.value.project
+}
+
+resource "google_compute_network_firewall_policy_rule" "ingress_allow" {
   for_each = {
-    for pair in setproduct(keys(google_compute_network.vpc), keys(local.ingress_allow_rules)) :
+    for pair in setproduct(keys(google_compute_network_firewall_policy.vpc), keys(local.ingress_allow_rules)) :
     "${pair[0]} ${pair[1]}" => merge(local.ingress_allow_rules[pair[1]], {
-      name    = pair[1]
-      network = pair[0]
+      name   = pair[1]
+      policy = pair[0]
     })
   }
 
-  name          = each.value.name
-  description   = each.value.description
-  project       = google_compute_network.vpc[each.value.network].project
-  network       = google_compute_network.vpc[each.value.network].id
-  direction     = "INGRESS"
-  priority      = each.value.priority
-  source_ranges = each.value.source_ranges
+  rule_name       = each.value.name
+  description     = each.value.description
+  project         = google_compute_network_firewall_policy.vpc[each.value.policy].project
+  firewall_policy = google_compute_network_firewall_policy.vpc[each.value.policy].name
+  direction       = "INGRESS"
+  priority        = each.value.priority
+  action          = "allow"
+  enable_logging  = each.value.enable_logging
 
-  allow {
-    protocol = each.value.protocol
-    ports    = each.value.ports
-  }
+  match {
+    src_ip_ranges = each.value.source_ranges
 
-  dynamic "log_config" {
-    for_each = each.value.enable_logging ? [true] : []
-
-    content {
-      metadata = "EXCLUDE_ALL_METADATA"
+    layer4_configs {
+      ip_protocol = each.value.protocol
+      ports       = each.value.ports
     }
   }
+}
+
+resource "google_compute_network_firewall_policy_association" "vpc" {
+  for_each = google_compute_network_firewall_policy.vpc
+
+  name              = each.value.name
+  project           = each.value.project
+  firewall_policy   = each.value.name
+  attachment_target = google_compute_network.vpc[each.key].id
 }
 
 resource "google_compute_firewall" "ingress_deny" {
