@@ -12,10 +12,10 @@
 
 ## How to verify
 
-<!-- Commands run, plan output, screenshots. -->
+<!-- Checks to run after the CI apply, with their expected results. The plan is in the CI comment. Delete this section if there are none. -->
 
 ## Checklist
 
 - [ ] Plan comment reviewed: it shows only the intended changes
-- [ ] No billable resources left running unintentionally
+- [ ] Billable resources in the plan are intended
 - [ ] Docs updated where relevant
