@@ -1,5 +1,11 @@
 region = "us-east1"
 
+groups = {
+  auditors            = "gcp-auditors"
+  iac_operators       = "gcp-iac-operators"
+  organization_admins = "gcp-organization-admins"
+}
+
 resource_locations = [
   "in:us-locations",
 ]

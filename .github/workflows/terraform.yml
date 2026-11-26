@@ -5,35 +5,41 @@ on:
     inputs:
       stage:
         type: string
-        description: Stage name, as used in the config and plans bucket paths and as the environment name.
+        description: Stage name, as used in the bucket paths and as the environment name.
         required: true
       working_directory:
         type: string
         description: Directory of the stage, relative to the repository root.
         required: true
+      service_account_prefix:
+        type: string
+        description: Prefix of the stage's CI/CD account names, such as iac-org.
+        required: true
+      tfvars_files:
+        type: string
+        description: Space-separated names of the earlier stages' tfvars files to download, such as 0-org-setup.
+        required: false
+        default: ""
     secrets:
-      workload_identity_provider:
-        description: Full resource name of the GitHub Actions Workload Identity provider.
-        required: true
-      config_bucket:
-        description: Bucket that holds the providers files and private inputs.
-        required: true
-      plans_bucket:
-        description: Bucket that holds the merge plans.
-        required: true
-      pr_service_account:
-        description: CI/CD service account for pull request plans.
-        required: true
-      merge_service_account:
-        description: CI/CD service account for merge plans.
-        required: true
-      # An environment secret reaches the job that sets the environment only under its own name.
-      CICD_APPLY_SA:
-        description: CI/CD service account for applies, a secret of the stage's environment.
+      domain:
+        description: Domain of the organization and its groups, masked in logs and redacted in the plan summary.
         required: true
 
 permissions:
   contents: read
+
+env:
+  IAC_PROJECT: ${{ vars.GCP_PREFIX }}-prod-iac-core-0
+  IAC_PROJECT_NUMBER: ${{ vars.GCP_IAC_PROJECT_NUMBER }}
+  STAGE: ${{ inputs.stage }}
+  TFVARS_FILES: ${{ inputs.tfvars_files }}
+  TF_VAR_billing_account: ${{ vars.GCP_BILLING_ACCOUNT }}
+  TF_VAR_domain: ${{ secrets.domain }}
+  TF_VAR_github_repository: ${{ github.repository }}
+  TF_VAR_github_repository_id: ${{ github.repository_id }}
+  TF_VAR_github_repository_owner_id: ${{ github.repository_owner_id }}
+  TF_VAR_org_id: ${{ vars.GCP_ORG_ID }}
+  TF_VAR_prefix: ${{ vars.GCP_PREFIX }}
 
 jobs:
   plan:
@@ -49,7 +55,7 @@ jobs:
         shell: bash
         working-directory: ${{ inputs.working_directory }}
     env:
-      STAGE: ${{ inputs.stage }}
+      SERVICE_ACCOUNT: ${{ inputs.service_account_prefix }}-cicd-${{ github.event_name == 'push' && 'merge' || 'pr' }}@${{ vars.GCP_PREFIX }}-prod-iac-core-0.iam.gserviceaccount.com
     outputs:
       applyable: ${{ steps.summary.outputs.applyable }}
       plan_attempt: ${{ steps.upload.outputs.attempt }}
@@ -58,16 +64,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Mask project identifiers
-        env:
-          SERVICE_ACCOUNT: ${{ github.event_name == 'push' && secrets.merge_service_account || secrets.pr_service_account }}
-          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.workload_identity_provider }}
+      - name: Check configuration
         run: |
-          project_id=${SERVICE_ACCOUNT#*@}
-          project_id=${project_id%%.*}
-          project_number=$(echo "$WORKLOAD_IDENTITY_PROVIDER" | cut -d / -f 2)
-          echo "::add-mask::${project_id}"
-          echo "::add-mask::${project_number}"
+          for name in IAC_PROJECT_NUMBER TF_VAR_billing_account TF_VAR_domain TF_VAR_org_id TF_VAR_prefix; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::${name} is empty. Set the repository variables and the GCP_DOMAIN secret."
+              exit 1
+            fi
+          done
 
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
@@ -76,23 +80,15 @@ jobs:
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ secrets.workload_identity_provider }}
-          service_account: ${{ github.event_name == 'push' && secrets.merge_service_account || secrets.pr_service_account }}
+          workload_identity_provider: projects/${{ vars.GCP_IAC_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github-actions
+          service_account: ${{ env.SERVICE_ACCOUNT }}
 
-      - name: Download config files
-        env:
-          CONFIG_BUCKET: ${{ secrets.config_bucket }}
+      - name: Download output files
         run: |
-          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-ro-providers.tf" "${STAGE}-ro-providers.tf"
-          gcloud storage cp "gs://${CONFIG_BUCKET}/private/${STAGE}.auto.tfvars" private.auto.tfvars
-
-      - name: Mask private values
-        run: |
-          values=$(grep -o '"[^"]*"' private.auto.tfvars | tr -d '"')
-          { echo "$values"; echo "$values" | sed -n 's/^[a-zA-Z]*://p'; } | sort -u | grep -v '^$' > "$RUNNER_TEMP/private-values.txt"
-          while read -r value; do
-            echo "::add-mask::${value}"
-          done < "$RUNNER_TEMP/private-values.txt"
+          gcloud storage cp "gs://${IAC_PROJECT}-outputs/providers/${STAGE}-ro-providers.tf" .
+          for file in $TFVARS_FILES; do
+            gcloud storage cp "gs://${IAC_PROJECT}-outputs/tfvars/${file}.auto.tfvars.json" .
+          done
 
       - name: Terraform init
         run: terraform init -input=false -lockfile=readonly -no-color
@@ -108,12 +104,11 @@ jobs:
           terraform show -json tfplan > "$RUNNER_TEMP/tfplan.json"
           applyable=$(jq '.applyable' "$RUNNER_TEMP/tfplan.json")
           echo "applyable=${applyable}" >> "$GITHUB_OUTPUT"
-          mapfile -t private_values < "$RUNNER_TEMP/private-values.txt"
           {
             echo "### Terraform plan: ${STAGE} at ${COMMIT_SHA::7}"
             echo
-            jq -r '
-              def redact: reduce ($ARGS.positional[] | select(. != "")) as $v (.; split($v) | join("***"));
+            jq -r --arg domain "$TF_VAR_domain" '
+              def redact: split($domain) | join("***");
               def count($action): [.resource_changes[]? | select(any(.change.actions[]; . == $action))] | length;
               def pad($width): . + " " * ($width - length);
               def line($address):
@@ -131,7 +126,7 @@ jobs:
                 | "output.\(.key)" as $address | .value.actions | line($address)]) as $lines
               | if $lines == [] then "No changes."
                 else "Plan: \(count("create")) to add, \(count("update")) to change, \(count("delete")) to destroy.\n\n```diff\n\($lines | join("\n"))\n```"
-                end' "$RUNNER_TEMP/tfplan.json" --args "${private_values[@]}"
+                end' "$RUNNER_TEMP/tfplan.json"
           } > plan-summary.md
           cat plan-summary.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -146,8 +141,6 @@ jobs:
       - name: Upload merge plan
         id: upload
         if: github.event_name == 'push' && steps.summary.outputs.applyable == 'true'
-        env:
-          PLANS_BUCKET: ${{ secrets.plans_bucket }}
         run: |
           token=$(gcloud auth print-access-token)
           echo "::add-mask::${token}"
@@ -156,7 +149,7 @@ jobs:
             --header "Authorization: Bearer ${token}" \
             --header "Content-Type: application/octet-stream" \
             --data-binary @tfplan \
-            "https://storage.googleapis.com/upload/storage/v1/b/${PLANS_BUCKET}/o?uploadType=media&ifGenerationMatch=0&name=${STAGE}%2F${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}.tfplan"
+            "https://storage.googleapis.com/upload/storage/v1/b/${IAC_PROJECT}-cicd-plans/o?uploadType=media&ifGenerationMatch=0&name=${STAGE}%2F${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}.tfplan"
           echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
   apply:
@@ -174,22 +167,20 @@ jobs:
         shell: bash
         working-directory: ${{ inputs.working_directory }}
     env:
-      STAGE: ${{ inputs.stage }}
+      SERVICE_ACCOUNT: ${{ inputs.service_account_prefix }}-cicd-apply@${{ vars.GCP_PREFIX }}-prod-iac-core-0.iam.gserviceaccount.com
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Mask project identifiers
-        env:
-          SERVICE_ACCOUNT: ${{ secrets.CICD_APPLY_SA }}
-          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.workload_identity_provider }}
+      - name: Check configuration
         run: |
-          project_id=${SERVICE_ACCOUNT#*@}
-          project_id=${project_id%%.*}
-          project_number=$(echo "$WORKLOAD_IDENTITY_PROVIDER" | cut -d / -f 2)
-          echo "::add-mask::${project_id}"
-          echo "::add-mask::${project_number}"
+          for name in IAC_PROJECT_NUMBER TF_VAR_billing_account TF_VAR_domain TF_VAR_org_id TF_VAR_prefix; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::${name} is empty. Set the repository variables and the GCP_DOMAIN secret."
+              exit 1
+            fi
+          done
 
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
@@ -198,26 +189,18 @@ jobs:
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ secrets.workload_identity_provider }}
-          service_account: ${{ secrets.CICD_APPLY_SA }}
+          workload_identity_provider: projects/${{ vars.GCP_IAC_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github-actions
+          service_account: ${{ env.SERVICE_ACCOUNT }}
 
-      - name: Download config files and merge plan
+      - name: Download output files and merge plan
         env:
-          CONFIG_BUCKET: ${{ secrets.config_bucket }}
-          PLANS_BUCKET: ${{ secrets.plans_bucket }}
           PLAN_ATTEMPT: ${{ needs.plan.outputs.plan_attempt }}
         run: |
-          gcloud storage cp "gs://${CONFIG_BUCKET}/providers/${STAGE}-providers.tf" "${STAGE}-providers.tf"
-          gcloud storage cp "gs://${CONFIG_BUCKET}/private/${STAGE}.auto.tfvars" private.auto.tfvars
-          gcloud storage cp "gs://${PLANS_BUCKET}/${STAGE}/${GITHUB_SHA}-${PLAN_ATTEMPT}.tfplan" merge.tfplan
-
-      - name: Mask private values
-        run: |
-          values=$(grep -o '"[^"]*"' private.auto.tfvars | tr -d '"')
-          { echo "$values"; echo "$values" | sed -n 's/^[a-zA-Z]*://p'; } | sort -u | grep -v '^$' > "$RUNNER_TEMP/private-values.txt"
-          while read -r value; do
-            echo "::add-mask::${value}"
-          done < "$RUNNER_TEMP/private-values.txt"
+          gcloud storage cp "gs://${IAC_PROJECT}-outputs/providers/${STAGE}-providers.tf" .
+          for file in $TFVARS_FILES; do
+            gcloud storage cp "gs://${IAC_PROJECT}-outputs/tfvars/${file}.auto.tfvars.json" .
+          done
+          gcloud storage cp "gs://${IAC_PROJECT}-cicd-plans/${STAGE}/${GITHUB_SHA}-${PLAN_ATTEMPT}.tfplan" merge.tfplan
 
       - name: Terraform init
         run: terraform init -input=false -lockfile=readonly -no-color

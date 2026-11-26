@@ -53,58 +53,6 @@ resource "google_storage_bucket_iam_member" "outputs_cicd" {
   member = google_service_account.cicd[each.key].member
 }
 
-resource "google_storage_bucket" "config" {
-  name                        = "${google_project.iac.project_id}-config"
-  project                     = google_project.iac.project_id
-  location                    = var.region
-  storage_class               = "STANDARD"
-  force_destroy               = true
-  uniform_bucket_level_access = true
-  public_access_prevention    = "enforced"
-
-  versioning {
-    enabled = true
-  }
-
-  lifecycle_rule {
-    condition {
-      num_newer_versions         = 5
-      days_since_noncurrent_time = 30
-    }
-    action {
-      type = "Delete"
-    }
-  }
-
-  depends_on = [google_project_service.iac]
-}
-
-moved {
-  from = google_storage_bucket.iac["config"]
-  to   = google_storage_bucket.config
-}
-
-resource "google_storage_bucket_iam_member" "config_cicd" {
-  for_each = local.cicd_service_accounts
-
-  bucket = google_storage_bucket.config.name
-  role   = "roles/storage.objectViewer"
-  member = google_service_account.cicd[each.key].member
-}
-
-resource "google_storage_managed_folder" "config_private" {
-  bucket        = google_storage_bucket.config.name
-  name          = "private/"
-  force_destroy = true
-}
-
-resource "google_storage_managed_folder_iam_member" "config_private" {
-  bucket         = google_storage_managed_folder.config_private.bucket
-  managed_folder = google_storage_managed_folder.config_private.name
-  role           = "roles/storage.objectUser"
-  member         = "group:${var.groups.iac_operators}"
-}
-
 resource "google_storage_managed_folder" "stage_state" {
   for_each = local.managed_folder_stages
 

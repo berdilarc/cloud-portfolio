@@ -1,0 +1,8 @@
+[env]
+TF_VAR_prefix                     = "<prefix>"
+TF_VAR_org_id                     = "<org_id>"
+TF_VAR_billing_account            = "<billing_account>"
+TF_VAR_domain                     = "<domain>"
+TF_VAR_github_repository          = "<github_repository>"
+TF_VAR_github_repository_id       = "<github_repository_id>"
+TF_VAR_github_repository_owner_id = "<github_repository_owner_id>"

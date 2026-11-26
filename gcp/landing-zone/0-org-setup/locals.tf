@@ -1,6 +1,10 @@
 locals {
   org_name = "organizations/${var.org_id}"
 
+  group_members = {
+    for key, name in var.groups : key => "group:${name}@${var.domain}"
+  }
+
   stages = {
     "0-org-setup" = {
       name        = "org setup"

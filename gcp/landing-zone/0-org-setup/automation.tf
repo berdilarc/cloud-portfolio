@@ -5,7 +5,7 @@ locals {
 
   local_plan_members = {
     agent         = google_service_account.agent.member
-    iac_operators = "group:${var.groups.iac_operators}"
+    iac_operators = local.group_members.iac_operators
   }
 
   local_plan_bindings = {
@@ -73,7 +73,7 @@ resource "google_service_account" "agent" {
 resource "google_service_account_iam_member" "agent" {
   service_account_id = google_service_account.agent.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "group:${var.groups.iac_operators}"
+  member             = local.group_members.iac_operators
 }
 
 resource "google_project_iam_member" "iac" {

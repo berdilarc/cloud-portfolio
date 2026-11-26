@@ -27,6 +27,7 @@ override.tf.json
 terraform.rc
 
 # Identifiers kept out of the public repo
+mise.local.toml
 private.auto.tfvars
 *-providers.tf
 *.auto.tfvars.json

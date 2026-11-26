@@ -8,12 +8,6 @@ locals {
   }
 
   tfvars_files = {
-    "0-globals" = jsonencode({
-      billing_account = { id = var.billing_account }
-      organization    = { id = var.org_id }
-      prefix          = var.prefix
-      region          = var.region
-    })
     "0-org-setup" = jsonencode({
       custom_roles = { for key, role in google_organization_iam_custom_role.stage : key => role.name }
       folder_ids = merge(
