@@ -81,7 +81,7 @@ Three buckets in the IaC core project, named `<project-id>-<purpose>`, in `regio
 
 All three have uniform bucket-level access, enforced public access prevention, and object versioning. A lifecycle rule deletes a noncurrent version once it has 5 newer versions and has been noncurrent for 30 days; an object [has to match all conditions](https://docs.cloud.google.com/storage/docs/lifecycle) of a rule. Terraform refuses to destroy the buckets (`prevent_destroy`).
 
-A fourth bucket, `cicd-plans`, holds the plan files that CI/CD saves between the merge plan and the apply. It has uniform bucket-level access and enforced public access prevention, but no object versioning and no soft delete, and a lifecycle rule deletes objects after 7 days. It has a managed folder for each stage with CI/CD enabled.
+A fourth bucket, `cicd-plans`, holds the plan files that CI/CD saves between the merge plan and the apply. It has uniform bucket-level access and enforced public access prevention, but no object versioning and no soft delete, and a lifecycle rule deletes objects after 7 days. It has a managed folder for each stage.
 
 `stage-state` has a [managed folder](https://docs.cloud.google.com/storage/docs/managed-folders) for each later stage (`2-networking/`, `2-project-factory/`). Each stage's service accounts get access to their own folder only.
 
@@ -95,7 +95,7 @@ Each stage has a read-write service account for `terraform apply` and a read-onl
 | `2-networking` | `iac-networking-rw` | `iac-networking-ro` |
 | `2-project-factory` | `iac-pf-rw` | `iac-pf-ro` |
 
-Each stage with CI/CD enabled (`0-org-setup` and `2-networking` so far) has three CI/CD accounts, one per workflow trigger. Each one impersonates a stage account. For `0-org-setup`:
+Each stage has three CI/CD accounts, one per workflow trigger. Each one impersonates a stage account. For `0-org-setup`:
 
 | Account | Runs | As |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ Each stage with CI/CD enabled (`0-org-setup` and `2-networking` so far) has thre
 | `iac-org-cicd-merge` | `terraform plan` on merges to `main` | `iac-org-ro` |
 | `iac-org-cicd-apply` | `terraform apply` after environment approval | `iac-org-rw` |
 
-The `2-networking` accounts are named the same way: `iac-networking-cicd-pr`, `iac-networking-cicd-merge`, and `iac-networking-cicd-apply`.
+The other stages' accounts are named the same way, such as `iac-networking-cicd-pr` and `iac-pf-cicd-pr`.
 
 `iac-agent` is an account for coding agents. It has no roles of its own and can only impersonate the read-only accounts, so an agent given its token can run plans but not applies.
 
