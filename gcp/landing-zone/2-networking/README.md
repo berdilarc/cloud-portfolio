@@ -22,11 +22,13 @@ Every host project has the APIs listed in `host_project_services` enabled and is
 
 Each host project has one custom-mode VPC with global dynamic routing and one subnet in `region`, with Private Google Access on. The spoke subnets have secondary ranges reserved for GKE Pods and Services. The ranges of the networks don't overlap, so they can be peered.
 
-| VPC | Project | Subnet | Primary range | Secondary ranges |
-| --- | --- | --- | --- | --- |
-| `hub-0` | `<prefix>-prod-net-core-0` | `hub-default` | `10.71.0.0/24` | |
-| `dev-0` | `<prefix>-dev-net-spoke-0` | `dev-default` | `10.73.0.0/24` | `pods` `10.73.64.0/18`, `services` `10.73.16.0/20` |
-| `prod-0` | `<prefix>-prod-net-spoke-0` | `prod-default` | `10.72.0.0/24` | `pods` `10.72.64.0/18`, `services` `10.72.16.0/20` |
+| VPC | Project | Subnet | Primary range | Secondary ranges | Flow logs |
+| --- | --- | --- | --- | --- | --- |
+| `hub-0` | `<prefix>-prod-net-core-0` | `hub-default` | `10.71.0.0/24` | | Off |
+| `dev-0` | `<prefix>-dev-net-spoke-0` | `dev-default` | `10.73.0.0/24` | `pods` `10.73.64.0/18`, `services` `10.73.16.0/20` | On |
+| `prod-0` | `<prefix>-prod-net-spoke-0` | `prod-default` | `10.72.0.0/24` | `pods` `10.72.64.0/18`, `services` `10.72.16.0/20` | Off |
+
+[VPC Flow Logs](https://docs.cloud.google.com/vpc/docs/flow-logs) on `dev-default` sample the network flows that its VMs send and receive, including VMs in service projects, and report them in the spoke host project's logs, as `compute.googleapis.com/vpc_flows`. The subnet reports every sampled flow (sampling rate 1.0), aggregated over 5 seconds, with all metadata fields. They're configured on the subnet through the Compute Engine API, not as a [Network Management API](https://docs.cloud.google.com/vpc/docs/using-flow-logs) configuration.
 
 ### Peering
 
