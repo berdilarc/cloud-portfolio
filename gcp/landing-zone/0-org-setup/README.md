@@ -39,6 +39,16 @@ The organization's domain and customer ID are read from the organization. A poli
 
 Organizations created on or after May 3, 2024 already enforce seven of these policies. See [Secure by default organizations](https://docs.cloud.google.com/resource-manager/docs/secure-by-default-organizations). On such an organization, import those policies before the first apply, because creating a policy that already exists fails with `409 Conflict`.
 
+### Tags
+
+The organization has one [Secure Tag](https://docs.cloud.google.com/firewall/docs/tags-firewalls-overview) key for firewalls, `firewall`. Its purpose is `GCE_FIREWALL` and its scope is the organization (`organization=auto`), so its values apply to VMs in any VPC of the organization and can be used in hierarchical firewall policies, which accept no network-scoped tags. Neither setting can change after the key is created.
+
+| Tag value | Selects | Tag User | Tag Viewer |
+| --- | --- | --- | --- |
+| `firewall/http-server` | VMs that serve HTTP and HTTPS behind a load balancer | `iac-networking-rw` | `iac-networking-ro` |
+
+Tag User lets `2-networking` use the value in firewall rules. The roles are granted on the value itself: tag values inherit IAM from their key and the organization, not from folders, so the stage's roles on the Networking folder don't reach them.
+
 ### Projects
 
 Project IDs are built from `prefix` as described in [ADR 0001](../../../docs/decisions/0001-name-resources-with-prefix-environment-purpose-counter.md). Each project's display name equals its project ID.
@@ -118,7 +128,7 @@ The `2-networking` accounts also get [FAST's networking roles](https://github.co
 | `iac-networking-ro` | Organization | Compute Organization Firewall Policy User and Compute Viewer |
 | `iac-networking-ro` | Networking folder | Viewer, Folder Viewer, and Tag Viewer |
 
-The folder roles also apply to the Development and Production folders inside it.
+The folder roles also apply to the Development and Production folders inside it. The accounts' roles on the `firewall/http-server` tag value are in [Tags](#tags).
 
 The stage 0 service accounts get the roles below. They follow the roles that [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic) grants on the organization, its projects, and the billing account, so the stage can manage a new type of resource without first granting itself a role.
 
@@ -229,7 +239,7 @@ The stage writes these files to the `outputs` bucket:
 | --- | --- |
 | `providers/<stage>-providers.tf` | gcs backend and `google` provider, both impersonating the stage's read-write account |
 | `providers/<stage>-ro-providers.tf` | The same for the read-only account |
-| `tfvars/0-org-setup.auto.tfvars.json` | Custom roles, folder IDs, project IDs, service accounts, buckets, and the workload identity provider |
+| `tfvars/0-org-setup.auto.tfvars.json` | Custom roles, folder IDs, project IDs, service accounts, buckets, tag values, and the workload identity provider |
 
 A stage copies the files it needs into its directory. They hold identifiers, so `.gitignore` keeps them out of the repository.
 
