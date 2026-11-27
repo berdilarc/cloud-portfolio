@@ -1,11 +1,12 @@
 locals {
   ingress_allow_rules = {
     allow-healthchecks = {
-      description    = "Allow SSH, HTTP, and HTTPS health checks."
-      enable_logging = false
-      priority       = 1001
-      protocol       = "tcp"
-      ports          = ["22", "80", "443"]
+      description        = "Allow SSH, HTTP, and HTTPS health checks to VMs tagged firewall/http-server."
+      enable_logging     = false
+      priority           = 1001
+      protocol           = "tcp"
+      ports              = ["22", "80", "443"]
+      target_secure_tags = ["firewall/http-server"]
       # https://docs.cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges
       source_ranges = [
         "35.191.0.0/16",
@@ -16,21 +17,23 @@ locals {
       ]
     }
     allow-ssh-from-iap = {
-      description    = "Allow SSH from IAP TCP forwarding."
-      enable_logging = true
-      priority       = 1002
-      protocol       = "tcp"
-      ports          = ["22"]
+      description        = "Allow SSH from IAP TCP forwarding."
+      enable_logging     = true
+      priority           = 1002
+      protocol           = "tcp"
+      ports              = ["22"]
+      target_secure_tags = []
       # https://docs.cloud.google.com/iap/docs/using-tcp-forwarding#create-firewall-rule
       source_ranges = ["35.235.240.0/20"]
     }
     allow-icmp = {
-      description    = "Allow ICMP from private ranges."
-      enable_logging = false
-      priority       = 1003
-      protocol       = "icmp"
-      ports          = null
-      source_ranges  = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+      description        = "Allow ICMP from private ranges."
+      enable_logging     = false
+      priority           = 1003
+      protocol           = "icmp"
+      ports              = null
+      target_secure_tags = []
+      source_ranges      = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
     }
   }
 }
@@ -57,6 +60,14 @@ resource "google_compute_firewall_policy_rule" "ingress_allow" {
     layer4_configs {
       ip_protocol = each.value.protocol
       ports       = each.value.ports
+    }
+  }
+
+  dynamic "target_secure_tags" {
+    for_each = toset(each.value.target_secure_tags)
+
+    content {
+      name = var.tag_values[target_secure_tags.key]
     }
   }
 }
