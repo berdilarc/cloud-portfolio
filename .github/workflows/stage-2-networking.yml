@@ -8,6 +8,7 @@ on:
       - .github/workflows/stage-2-networking.yml
       - mise.toml
       - mise.lock
+      - "!gcp/landing-zone/2-networking/**/*.md"
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - .github/workflows/stage-2-networking.yml
       - mise.toml
       - mise.lock
+      - "!gcp/landing-zone/2-networking/**/*.md"
 
 permissions:
   contents: read
