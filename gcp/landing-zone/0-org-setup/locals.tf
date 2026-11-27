@@ -18,7 +18,7 @@ locals {
     }
     "2-project-factory" = {
       name        = "project factory"
-      enable_cicd = false
+      enable_cicd = true
       sa_prefix   = "iac-pf"
     }
   }
