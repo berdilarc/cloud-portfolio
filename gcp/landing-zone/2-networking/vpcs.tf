@@ -2,17 +2,20 @@ locals {
   subnets = {
     hub = {
       ip_cidr_range       = "10.71.0.0/24"
+      enable_flow_logs    = false
       secondary_ip_ranges = {}
     }
     dev = {
-      ip_cidr_range = "10.73.0.0/24"
+      ip_cidr_range    = "10.73.0.0/24"
+      enable_flow_logs = true
       secondary_ip_ranges = {
         pods     = "10.73.64.0/18"
         services = "10.73.16.0/20"
       }
     }
     prod = {
-      ip_cidr_range = "10.72.0.0/24"
+      ip_cidr_range    = "10.72.0.0/24"
+      enable_flow_logs = false
       secondary_ip_ranges = {
         pods     = "10.72.64.0/18"
         services = "10.72.16.0/20"
@@ -48,6 +51,16 @@ resource "google_compute_subnetwork" "default" {
     content {
       range_name    = secondary_ip_range.key
       ip_cidr_range = secondary_ip_range.value
+    }
+  }
+
+  dynamic "log_config" {
+    for_each = each.value.enable_flow_logs ? [1] : []
+
+    content {
+      aggregation_interval = "INTERVAL_5_SEC"
+      flow_sampling        = 1
+      metadata             = "INCLUDE_ALL_METADATA"
     }
   }
 }
