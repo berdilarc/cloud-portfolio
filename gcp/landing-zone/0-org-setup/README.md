@@ -130,6 +130,13 @@ The `2-networking` accounts also get [FAST's networking roles](https://github.co
 
 The folder roles also apply to the Development and Production folders inside it. The accounts' roles on the `firewall/http-server` tag value are in [Tags](#tags).
 
+The `2-project-factory` accounts get [FAST's project factory roles](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic), so the stage can create team folders and projects in the Teams folder:
+
+| Account | Scope | Roles |
+| --- | --- | --- |
+| `iac-pf-rw` | Teams folder | Owner, Folder Admin, Project Creator, Tag User, and Service Project Network Admin (custom) |
+| `iac-pf-ro` | Teams folder | Viewer, Folder Viewer, and Tag Viewer |
+
 The stage 0 service accounts get the roles below. They follow the roles that [FAST's stage 0](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/v60.0.0/fast/stages/0-org-setup/datasets/classic) grants on the organization, its projects, and the billing account, so the stage can manage a new type of resource without first granting itself a role.
 
 | Account | Scope | Roles |
@@ -145,11 +152,12 @@ The stage 0 service accounts get the roles below. They follow the roles that [FA
 
 The custom roles are defined on the organization, with the permissions of FAST's roles of the same name:
 
-| Role ID | Title | Reads |
+| Role ID | Title | Allows |
 | --- | --- | --- |
-| `organizationAdminViewer` | Organization Admin Viewer | The organization, folders, and projects with their IAM policies, org policies, Essential Contacts, logging settings, and bucket IAM policies |
-| `storageViewer` | Storage Viewer with IAM | Buckets, managed folders, and objects with their IAM policies, bucket tags, object insights, and multipart uploads |
-| `tagViewer` | Tag Viewer with IAM | Tag keys and tag values with their IAM policies, and tag holds |
+| `organizationAdminViewer` | Organization Admin Viewer | Reading the organization, folders, and projects with their IAM policies, org policies, Essential Contacts, logging settings, and bucket IAM policies |
+| `serviceProjectNetworkAdmin` | Service Project Network Admin | Attaching service projects to Shared VPC host projects, managing subnet IAM policies, peering with networks, and binding private DNS zones to networks |
+| `storageViewer` | Storage Viewer with IAM | Reading buckets, managed folders, and objects with their IAM policies, bucket tags, object insights, and multipart uploads |
+| `tagViewer` | Tag Viewer with IAM | Reading tag keys and tag values with their IAM policies, and tag holds |
 
 The accounts and principals that impersonate others get Service Account Token Creator (`roles/iam.serviceAccountTokenCreator`) on them:
 
