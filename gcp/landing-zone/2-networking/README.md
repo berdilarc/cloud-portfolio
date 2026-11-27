@@ -1,6 +1,6 @@
 # 2-networking
 
-The networking stage. It manages the hub and spoke host projects that the workload projects get their networks from.
+The networking stage. It manages the hub and spoke host projects that the workload projects get their networks from, and their VPCs, peering, NAT, DNS, and firewall rules.
 
 ## What it manages
 
@@ -77,7 +77,7 @@ Each VPC has the same ingress rules. The allow rules live in one [hierarchical f
 | `allow-icmp` | Hierarchical | 1003 | Allow | All VMs | `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` | ICMP | Off |
 | `ingress-default-deny` | VPC | 65535 | Deny | All VMs | `0.0.0.0/0` | All | On |
 
-`firewall/http-server` is an organization-scoped [Secure Tag](https://docs.cloud.google.com/firewall/docs/tags-firewalls-overview) created by `0-org-setup`, which passes its ID in `tag_values`. Hierarchical rules accept only organization-scoped tags. A VM gets the health check rule only when the value is bound to it, which takes Tag User on the value, so a workload can't make itself a target by editing its own VM. The stage's read-write account holds Tag User on the value to use it in rules.
+`firewall/http-server` is an organization-scoped [Secure Tag](https://docs.cloud.google.com/firewall/docs/tags-firewalls-overview) created by `0-org-setup`, which passes its ID in `tag_values`. Hierarchical rules accept only tags whose purpose data is the organization, not a single VPC network. A VM gets the health check rule only when the value is bound to it, which takes Tag User on the value and a tag binding permission on the VM, so a workload can't make itself a target by editing its own VM. The stage's read-write account holds Tag User on the value to use it in rules.
 
 Hierarchical policies are [evaluated](https://docs.cloud.google.com/firewall/docs/firewall-policies-rule-eval-order) before any VPC firewall rule, and a matching allow rule ends the evaluation. Traffic that no policy rule matches goes on to the VPC rules, where `ingress-default-deny` blocks it.
 

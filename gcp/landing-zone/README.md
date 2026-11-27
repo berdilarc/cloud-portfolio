@@ -7,7 +7,7 @@ The layout follows the stage names of [Cloud Foundation Fabric FAST](https://git
 | Stage | Contents |
 | --- | --- |
 | [`0-org-setup`](0-org-setup/) | Folders; IaC core, billing export, and audit logs projects; state buckets and service accounts for every stage; and Workload Identity Federation for GitHub Actions |
-| [`2-networking`](2-networking/) | Hub and spoke host projects |
+| [`2-networking`](2-networking/) | Hub and spoke host projects with their VPCs, peering, Cloud NAT, Cloud DNS zones, and firewall policies |
 
 ## Hand-off between stages
 
