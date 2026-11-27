@@ -66,14 +66,16 @@ A [peering zone](https://docs.cloud.google.com/dns/docs/zones/peering-zones) for
 
 ### Firewall
 
-Each VPC has the same ingress rules, all with no targets, so they apply to every VM in the network. The allow rules live in one [hierarchical firewall policy](https://docs.cloud.google.com/firewall/docs/firewall-policies), `network-policy`, which is created in the Networking folder and associated with it, so it applies to the VPCs of all three host projects. VMs in Shared VPC service projects get the same rules, because the host project's folder decides which hierarchical policies apply. The deny rule is a [VPC firewall rule](https://docs.cloud.google.com/firewall/docs/firewalls) in each VPC.
+Each VPC has the same ingress rules. The allow rules live in one [hierarchical firewall policy](https://docs.cloud.google.com/firewall/docs/firewall-policies), `network-policy`, which is created in the Networking folder and associated with it, so it applies to the VPCs of all three host projects. VMs in Shared VPC service projects get the same rules, because the host project's folder decides which hierarchical policies apply. The deny rule is a [VPC firewall rule](https://docs.cloud.google.com/firewall/docs/firewalls) in each VPC.
 
-| Rule | Kind | Priority | Action | Sources | Protocols and ports | Logging |
-| --- | --- | --- | --- | --- | --- | --- |
-| `allow-healthchecks` | Hierarchical | 1001 | Allow | [Health check probe ranges](https://docs.cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges) | TCP 22, 80, and 443 | Off |
-| `allow-ssh-from-iap` | Hierarchical | 1002 | Allow | `35.235.240.0/20`, the [IAP TCP forwarding](https://docs.cloud.google.com/iap/docs/using-tcp-forwarding) range | TCP 22 | On |
-| `allow-icmp` | Hierarchical | 1003 | Allow | `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` | ICMP | Off |
-| `ingress-default-deny` | VPC | 65535 | Deny | `0.0.0.0/0` | All | On |
+| Rule | Kind | Priority | Action | Targets | Sources | Protocols and ports | Logging |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `allow-healthchecks` | Hierarchical | 1001 | Allow | VMs tagged `firewall/http-server` | [Health check probe ranges](https://docs.cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges) | TCP 22, 80, and 443 | Off |
+| `allow-ssh-from-iap` | Hierarchical | 1002 | Allow | All VMs | `35.235.240.0/20`, the [IAP TCP forwarding](https://docs.cloud.google.com/iap/docs/using-tcp-forwarding) range | TCP 22 | On |
+| `allow-icmp` | Hierarchical | 1003 | Allow | All VMs | `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` | ICMP | Off |
+| `ingress-default-deny` | VPC | 65535 | Deny | All VMs | `0.0.0.0/0` | All | On |
+
+`firewall/http-server` is an organization-scoped [Secure Tag](https://docs.cloud.google.com/firewall/docs/tags-firewalls-overview) created by `0-org-setup`, which passes its ID in `tag_values`. Hierarchical rules accept only organization-scoped tags. A VM gets the health check rule only when the value is bound to it, which takes Tag User on the value, so a workload can't make itself a target by editing its own VM. The stage's read-write account holds Tag User on the value to use it in rules.
 
 Hierarchical policies are [evaluated](https://docs.cloud.google.com/firewall/docs/firewall-policies-rule-eval-order) before any VPC firewall rule, and a matching allow rule ends the evaluation. Traffic that no policy rule matches goes on to the VPC rules, where `ingress-default-deny` blocks it.
 
@@ -91,7 +93,7 @@ Hierarchical policies are [evaluated](https://docs.cloud.google.com/firewall/doc
 
 `prefix` and `billing_account` come from `TF_VAR_*` environment variables. See [Configuration](../README.md#configuration).
 
-`folder_ids` comes from the `0-org-setup` tfvars file. The file holds more values than the stage declares, so Terraform warns about the undeclared ones. See [Values for undeclared variables](https://developer.hashicorp.com/terraform/language/values/variables).
+`folder_ids` and `tag_values` come from the `0-org-setup` tfvars file. The file holds more values than the stage declares, so Terraform warns about the undeclared ones. See [Values for undeclared variables](https://developer.hashicorp.com/terraform/language/values/variables).
 
 ## Running
 
