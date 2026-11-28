@@ -1,0 +1,39 @@
+name: stage-2-project-factory
+
+on:
+  pull_request:
+    paths:
+      - gcp/landing-zone/2-project-factory/**
+      - .github/workflows/terraform.yml
+      - .github/workflows/stage-2-project-factory.yml
+      - mise.toml
+      - mise.lock
+      - "!gcp/landing-zone/2-project-factory/**/*.md"
+  push:
+    branches:
+      - main
+    paths:
+      - gcp/landing-zone/2-project-factory/**
+      - .github/workflows/terraform.yml
+      - .github/workflows/stage-2-project-factory.yml
+      - mise.toml
+      - mise.lock
+      - "!gcp/landing-zone/2-project-factory/**/*.md"
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation login to Google Cloud
+      pull-requests: write # plan summary comment
+    uses: ./.github/workflows/terraform.yml
+    with:
+      stage: 2-project-factory
+      working_directory: gcp/landing-zone/2-project-factory
+      service_account_prefix: iac-pf
+      tfvars_files: 0-org-setup
+    secrets:
+      domain: ${{ secrets.GCP_DOMAIN }}
