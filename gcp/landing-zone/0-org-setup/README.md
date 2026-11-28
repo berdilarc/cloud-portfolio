@@ -256,6 +256,8 @@ The stage writes these files to the `outputs` bucket:
 
 A stage copies the files it needs into its directory. They hold identifiers, so `.gitignore` keeps them out of the repository.
 
+`2-networking` writes its own `tfvars/2-networking.auto.tfvars.json`. On that object only, `iac-networking-rw` gets Storage Object User and `iac-networking-ro` gets Storage Object Viewer, through an [IAM condition](https://docs.cloud.google.com/iam/docs/conditions-overview) on the object name.
+
 ## Prerequisites
 
 - Terraform 1.17.0 or later.
