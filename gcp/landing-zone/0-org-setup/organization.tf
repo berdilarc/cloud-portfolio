@@ -22,6 +22,23 @@ locals {
         "storage.buckets.getIamPolicy",
       ]
     }
+    service_project_network_admin = {
+      role_id     = "serviceProjectNetworkAdmin"
+      title       = "Service Project Network Admin"
+      description = "Attach service projects to Shared VPC host projects, manage subnet IAM policies, peer with networks, and bind private DNS zones to networks."
+      permissions = [
+        "compute.globalOperations.get",
+        "compute.networks.get",
+        "compute.networks.updatePeering",
+        "compute.organizations.disableXpnResource",
+        "compute.organizations.enableXpnResource",
+        "compute.projects.get",
+        "compute.subnetworks.getIamPolicy",
+        "compute.subnetworks.setIamPolicy",
+        "dns.networks.bindPrivateDNSZone",
+        "resourcemanager.projects.get",
+      ]
+    }
     storage_viewer = {
       role_id     = "storageViewer"
       title       = "Storage Viewer with IAM"

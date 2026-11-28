@@ -30,6 +30,31 @@ locals {
       ]
     ]) : "${binding.service_account} ${binding.role}" => binding
   }
+
+  teams_folder_roles = {
+    "iac-pf-rw" = [
+      "roles/owner",
+      "roles/resourcemanager.folderAdmin",
+      "roles/resourcemanager.projectCreator",
+      "roles/resourcemanager.tagUser",
+    ]
+    "iac-pf-ro" = [
+      "roles/resourcemanager.folderViewer",
+      "roles/resourcemanager.tagViewer",
+      "roles/viewer",
+    ]
+  }
+
+  teams_folder_bindings = {
+    for binding in flatten([
+      for sa, roles in local.teams_folder_roles : [
+        for role in roles : {
+          service_account = sa
+          role            = role
+        }
+      ]
+    ]) : "${binding.service_account} ${binding.role}" => binding
+  }
 }
 
 resource "google_folder" "networking" {
@@ -59,4 +84,18 @@ resource "google_folder" "teams" {
   parent       = local.org_name
 
   depends_on = [google_logging_organization_settings.default]
+}
+
+resource "google_folder_iam_member" "teams" {
+  for_each = local.teams_folder_bindings
+
+  folder = google_folder.teams.name
+  role   = each.value.role
+  member = google_service_account.stage[each.value.service_account].member
+}
+
+resource "google_folder_iam_member" "teams_custom" {
+  folder = google_folder.teams.name
+  role   = google_organization_iam_custom_role.stage["service_project_network_admin"].name
+  member = google_service_account.stage["iac-pf-rw"].member
 }
