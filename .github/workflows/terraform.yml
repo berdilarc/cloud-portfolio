@@ -90,6 +90,27 @@ jobs:
             gcloud storage cp "gs://${IAC_PROJECT}-outputs/tfvars/${file}.auto.tfvars.json" .
           done
 
+      # The gcs backend writes an empty state when it finds none, which the
+      # read-only account can't do. Until the first apply, plan against an
+      # empty local state instead.
+      - name: Check for existing state
+        env:
+          READ_ONLY_ACCOUNT: ${{ inputs.service_account_prefix }}-ro@${{ vars.GCP_PREFIX }}-prod-iac-core-0.iam.gserviceaccount.com
+        run: |
+          if [[ "$STAGE" == "0-org-setup" ]]; then
+            state="gs://${IAC_PROJECT}-org-state/default.tfstate"
+          else
+            state="gs://${IAC_PROJECT}-stage-state/${STAGE}/default.tfstate"
+          fi
+          if ! output=$(gcloud storage objects describe "$state" --impersonate-service-account "$READ_ONLY_ACCOUNT" --format "value(name)" 2>&1); then
+            if [[ "$output" != *"not found: 404"* ]]; then
+              echo "$output"
+              exit 1
+            fi
+            echo "::notice::No state at ${state} yet. Planning against an empty local state."
+            printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
+          fi
+
       - name: Terraform init
         run: terraform init -input=false -lockfile=readonly -no-color
 

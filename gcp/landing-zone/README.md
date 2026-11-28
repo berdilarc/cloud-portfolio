@@ -49,6 +49,14 @@ Each stage with CI/CD has a caller workflow that runs the reusable workflow [`te
 
 The `apply` job runs only when the merge plan has changes. The saved plan is only compared, never applied: the job applies the plan it made itself. The comparison covers every resource and output change that isn't a no-op, values before the change included, so it also fails if a resource in the plan changed outside Terraform after the merge plan.
 
+A new stage has no state until its first apply. When the gcs backend finds no state, `terraform init` writes an empty one, which the read-only account can't do (see [the backend's source](https://github.com/hashicorp/terraform/blob/main/internal/backend/remote-state/gcs/backend_state.go)). So when `default.tfstate` doesn't exist, the `plan` job writes a `backend_override.tf` with a local backend and plans against an empty local state. Any other error from the check fails the job. The `apply` job always uses the gcs backend, so its read-write account writes the state. To plan such a stage locally, create the same file in the stage directory before `terraform init` (`.gitignore` covers `*_override.tf`), and delete it after the first apply:
+
+```hcl
+terraform {
+  backend "local" {}
+}
+```
+
 ### Setup
 
 Repository variables and a secret:
