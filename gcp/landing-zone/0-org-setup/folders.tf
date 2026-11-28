@@ -18,6 +18,9 @@ locals {
       "roles/resourcemanager.tagViewer",
       "roles/viewer",
     ]
+    "iac-pf-ro" = [
+      "roles/compute.viewer",
+    ]
   }
 
   networking_folder_bindings = {
@@ -30,6 +33,18 @@ locals {
       ]
     ]) : "${binding.service_account} ${binding.role}" => binding
   }
+
+  networking_folder_custom_roles = {
+    "iac-pf-rw" = "service_project_network_admin"
+    "iac-pf-ro" = "project_iam_viewer"
+  }
+
+  shared_vpc_grantable_roles = [
+    "roles/composer.sharedVpcAgent",
+    "roles/compute.networkUser",
+    "roles/container.hostServiceAgentUser",
+    "roles/vpcaccess.user",
+  ]
 
   teams_folder_roles = {
     "iac-pf-rw" = [
@@ -70,6 +85,27 @@ resource "google_folder_iam_member" "networking" {
   folder = google_folder.networking.name
   role   = each.value.role
   member = google_service_account.stage[each.value.service_account].member
+}
+
+resource "google_folder_iam_member" "networking_custom" {
+  for_each = local.networking_folder_custom_roles
+
+  folder = google_folder.networking.name
+  role   = google_organization_iam_custom_role.stage[each.value].name
+  member = google_service_account.stage[each.key].member
+}
+
+# The project factory can grant service projects the Shared VPC roles they
+# need on the host projects, and no other role.
+resource "google_folder_iam_member" "networking_project_iam_admin" {
+  folder = google_folder.networking.name
+  role   = "roles/resourcemanager.projectIamAdmin"
+  member = google_service_account.stage["iac-pf-rw"].member
+
+  condition {
+    title      = "Shared VPC grants only"
+    expression = "api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(${jsonencode(local.shared_vpc_grantable_roles)})"
+  }
 }
 
 resource "google_folder" "networking_environment" {

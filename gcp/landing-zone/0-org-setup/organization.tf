@@ -22,6 +22,18 @@ locals {
         "storage.buckets.getIamPolicy",
       ]
     }
+    project_iam_viewer = {
+      role_id     = "projectIamViewer"
+      title       = "Project IAM Viewer"
+      description = "Read projects with their IAM policies, and the policy bindings that apply to them."
+      permissions = [
+        "iam.policybindings.get",
+        "iam.policybindings.list",
+        "resourcemanager.projects.get",
+        "resourcemanager.projects.getIamPolicy",
+        "resourcemanager.projects.searchPolicyBindings",
+      ]
+    }
     service_project_network_admin = {
       role_id     = "serviceProjectNetworkAdmin"
       title       = "Service Project Network Admin"
