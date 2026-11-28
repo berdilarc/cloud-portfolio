@@ -25,14 +25,14 @@ locals {
 
   stage_modes = {
     rw = {
-      access     = "read-write"
-      command    = "apply"
-      state_role = "roles/storage.objectUser"
+      access      = "read-write"
+      command     = "apply"
+      object_role = "roles/storage.objectUser"
     }
     ro = {
-      access     = "read-only"
-      command    = "plan"
-      state_role = "roles/storage.objectViewer"
+      access      = "read-only"
+      command     = "plan"
+      object_role = "roles/storage.objectViewer"
     }
   }
 
