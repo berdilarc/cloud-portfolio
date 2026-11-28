@@ -8,6 +8,7 @@ The layout follows the stage names of [Cloud Foundation Fabric FAST](https://git
 | --- | --- |
 | [`0-org-setup`](0-org-setup/) | Folders; IaC core, billing export, and audit logs projects; state buckets and service accounts for every stage; and Workload Identity Federation for GitHub Actions |
 | [`2-networking`](2-networking/) | Hub and spoke host projects with their VPCs, peering, Cloud NAT, Cloud DNS zones, and firewall policies |
+| [`2-project-factory`](2-project-factory/) | Team folders for the workload projects |
 
 ## Hand-off between stages
 
@@ -39,7 +40,7 @@ In CI/CD, they come from repository variables, a secret, and the workflow contex
 
 ## CI/CD
 
-Each stage with CI/CD has a caller workflow that runs the reusable workflow [`terraform.yml`](../../.github/workflows/terraform.yml), with an environment named after the stage and the stage's three CI/CD accounts (see [Service accounts](0-org-setup/README.md#service-accounts)). [`stage-0-org-setup.yml`](../../.github/workflows/stage-0-org-setup.yml) and [`stage-2-networking.yml`](../../.github/workflows/stage-2-networking.yml) each run when a change touches a file other than Markdown in their stage directory, either workflow file, or `mise.toml` and `mise.lock`, which pin Terraform. A caller also lists the earlier stages' tfvars files that its stage needs, in `tfvars_files`. In the table, `<stage>` and `<service_account_prefix>` are the caller's inputs, such as `2-networking` and `iac-networking`.
+Each stage with CI/CD has a caller workflow that runs the reusable workflow [`terraform.yml`](../../.github/workflows/terraform.yml), with an environment named after the stage and the stage's three CI/CD accounts (see [Service accounts](0-org-setup/README.md#service-accounts)). [`stage-0-org-setup.yml`](../../.github/workflows/stage-0-org-setup.yml), [`stage-2-networking.yml`](../../.github/workflows/stage-2-networking.yml), and [`stage-2-project-factory.yml`](../../.github/workflows/stage-2-project-factory.yml) each run when a change touches a file other than Markdown in their stage directory, either workflow file, or `mise.toml` and `mise.lock`, which pin Terraform. A caller also lists the earlier stages' tfvars files that its stage needs, in `tfvars_files`. In the table, `<stage>` and `<service_account_prefix>` are the caller's inputs, such as `2-networking` and `iac-networking`.
 
 | Trigger | Job | Account | What it does |
 | --- | --- | --- | --- |
