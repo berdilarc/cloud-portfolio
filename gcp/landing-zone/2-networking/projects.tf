@@ -15,8 +15,6 @@ locals {
   }
 }
 
-# The compute.skipDefaultNetworkCreation org policy stops the default network.
-#trivy:ignore:AVD-GCP-0010
 resource "google_project" "host" {
   for_each = local.host_projects
 
