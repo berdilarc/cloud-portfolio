@@ -1,0 +1,2 @@
+# The compute.skipDefaultNetworkCreation org policy stops the default network.
+GCP-0010

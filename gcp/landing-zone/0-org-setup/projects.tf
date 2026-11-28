@@ -9,8 +9,6 @@ locals {
   }
 }
 
-# The compute.skipDefaultNetworkCreation org policy stops the default network.
-#trivy:ignore:AVD-GCP-0010
 resource "google_project" "iac" {
   name            = local.iac_project_id
   project_id      = local.iac_project_id
@@ -31,8 +29,6 @@ resource "google_project_service" "iac" {
   disable_on_destroy = false
 }
 
-# The compute.skipDefaultNetworkCreation org policy stops the default network.
-#trivy:ignore:AVD-GCP-0010
 resource "google_project" "billing_export" {
   name            = local.billing_export_project_id
   project_id      = local.billing_export_project_id
@@ -53,8 +49,6 @@ resource "google_project_iam_member" "billing_export" {
   member  = google_service_account.stage[each.key].member
 }
 
-# The compute.skipDefaultNetworkCreation org policy stops the default network.
-#trivy:ignore:AVD-GCP-0010
 resource "google_project" "audit_logs" {
   name            = local.audit_logs_project_id
   project_id      = local.audit_logs_project_id
